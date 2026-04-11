@@ -102,14 +102,41 @@ flowchart LR
 
 ## Screenshots
 
-> Screenshots will be added to [docs/screenshots/](docs/screenshots/). Planned shots:
->
-> - **01-login.png** — Login / register screen
-> - **02-rider-map-picker.png** — Rider picking pickup + dropoff on the map
-> - **03-rider-live-bids.png** — Drivers' bids rolling in live
-> - **04-driver-open-rides.png** — Driver browsing open requests with mini-maps
-> - **05-trip-in-progress.png** — Active trip card, Start → Complete buttons
-> - **06-rating.png** — Post-trip rating form
+### Login
+
+![Login](docs/screenshots/01-login.png)
+
+### Rider — picking pickup & dropoff on the map
+
+Search by address, landmark, or sector. Results come back with type badges (suburb / residential / street / building) so you can pick the right granularity. Click anywhere on the map for exact pin placement.
+
+![Rider map picker](docs/screenshots/02-rider-map-picker.png)
+
+### Rider — live driver bids
+
+Drivers bid their own price and ETA. The rider sees all offers live and picks the best one.
+
+![Rider live bids](docs/screenshots/03-rider-live-bids.png)
+
+### Driver — browsing open rides
+
+Each open request shows a mini-map with the pickup → dropoff route, so drivers know what they're bidding on.
+
+![Driver open rides](docs/screenshots/04-driver-open-rides.png)
+
+### Trip in progress
+
+Once the rider accepts a bid, the driver moves the ride through the lifecycle: accepted → in progress → completed.
+
+![Trip in progress](docs/screenshots/05-trip-in-progress.png)
+
+### Post-trip rating
+
+Both sides rate each other. One rating per side, locked once submitted.
+
+![Rating](docs/screenshots/06-rating.png)
+
+> Screenshots are captured reproducibly by [`frontend/scripts/screenshots.mjs`](frontend/scripts/screenshots.mjs) — it drives headless Chrome through real flows with API-seeded state.
 
 ---
 

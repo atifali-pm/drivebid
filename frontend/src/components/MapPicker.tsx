@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useState } from "react";
+import { KeyboardEvent, useCallback, useState } from "react";
 import {
   MapContainer,
   Marker,
@@ -217,13 +217,19 @@ export default function MapPicker({ value, onChange }: Props) {
     [onChange, value]
   );
 
-  async function handleSearch(e: FormEvent) {
-    e.preventDefault();
+  async function runSearch() {
     setSearching(true);
     try {
       setResults(await geocode(search, mapCenter));
     } finally {
       setSearching(false);
+    }
+  }
+
+  function handleSearchKey(e: KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      runSearch();
     }
   }
 
@@ -269,21 +275,23 @@ export default function MapPicker({ value, onChange }: Props) {
         <p className="text-xs text-slate-500 ml-auto">Click map or search</p>
       </div>
 
-      <form onSubmit={handleSearch} className="flex gap-2">
+      <div className="flex gap-2">
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={handleSearchKey}
           placeholder="Search address, street, or landmark..."
           className="flex-1 border border-slate-300 rounded-md px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
         />
         <button
-          type="submit"
+          type="button"
+          onClick={runSearch}
           disabled={searching}
           className="text-sm bg-slate-700 hover:bg-slate-800 text-white px-3 py-1.5 rounded-md disabled:opacity-60"
         >
           {searching ? "..." : "Search"}
         </button>
-      </form>
+      </div>
 
       {results.length > 0 && (
         <ul className="border border-slate-200 rounded-md max-h-60 overflow-y-auto bg-white divide-y divide-slate-100">
