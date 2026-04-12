@@ -124,6 +124,7 @@ export const api = {
     full_name: string;
     password: string;
     role: UserRole;
+    phone?: string;
   }) =>
     request<TokenResponse>("/auth/register", {
       method: "POST",

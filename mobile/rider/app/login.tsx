@@ -72,8 +72,12 @@ export default function Login() {
           </Text>
         </Pressable>
 
+        <Pressable onPress={() => router.push("/phone-auth")}>
+          <Text style={styles.link}>Sign in with phone number</Text>
+        </Pressable>
+
         <Pressable onPress={() => router.push("/register")}>
-          <Text style={styles.link}>New to DriveBid? Create an account</Text>
+          <Text style={[styles.link, { marginTop: 8 }]}>New to DriveBid? Create an account</Text>
         </Pressable>
       </View>
     </KeyboardAvoidingView>

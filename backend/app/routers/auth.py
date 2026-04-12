@@ -3,10 +3,12 @@ import string
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..auth import create_access_token, get_current_user, hash_password, require_role, verify_password
 from ..database import get_db
+from ..firebase import is_available as firebase_available, verify_firebase_token
 from ..models import OTP, User, UserRole
 from ..schemas import (
     DriverVerification,
@@ -17,6 +19,14 @@ from ..schemas import (
     UserLogin,
     UserOut,
 )
+
+
+class FirebasePhoneAuth(BaseModel):
+    """Client sends the Firebase ID token after completing phone auth on the client side."""
+    firebase_id_token: str
+    full_name: str = ""
+    role: UserRole = UserRole.rider
+    referral_code_used: str | None = None
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -153,3 +163,75 @@ def verify_driver(
 @router.get("/me", response_model=UserOut)
 def get_me(user: User = Depends(get_current_user)):
     return UserOut.model_validate(user)
+
+
+@router.post("/firebase-phone", response_model=Token)
+def firebase_phone_auth(payload: FirebasePhoneAuth, db: Session = Depends(get_db)):
+    """
+    Authenticate or register via Firebase Phone Auth.
+
+    Flow:
+    1. Client completes Firebase phone verification (reCAPTCHA + SMS)
+       and gets a Firebase ID token.
+    2. Client sends the ID token to this endpoint.
+    3. Backend verifies it with Firebase Admin SDK.
+    4. If user exists (by phone), log them in.
+    5. If new phone, create an account.
+    """
+    if not firebase_available():
+        raise HTTPException(
+            status_code=503,
+            detail="Firebase not configured. Phone auth unavailable.",
+        )
+    try:
+        decoded = verify_firebase_token(payload.firebase_id_token)
+    except Exception as e:
+        raise HTTPException(status_code=401, detail=f"Invalid Firebase token: {e}")
+
+    phone = decoded.get("phone_number")
+    if not phone:
+        raise HTTPException(
+            status_code=400, detail="Firebase token does not contain a phone number"
+        )
+
+    user = db.query(User).filter(User.phone == phone).first()
+    if user:
+        # Existing user — log in
+        token = create_access_token(user.id)
+        return Token(access_token=token, user=UserOut.model_validate(user))
+
+    # New user — register
+    if not payload.full_name:
+        raise HTTPException(
+            status_code=400,
+            detail="full_name is required for first-time phone registration",
+        )
+
+    referred_by = None
+    if payload.referral_code_used:
+        referrer = (
+            db.query(User)
+            .filter(User.referral_code == payload.referral_code_used)
+            .first()
+        )
+        if referrer:
+            referred_by = referrer.id
+
+    referral_code = _generate_referral_code()
+    while db.query(User).filter(User.referral_code == referral_code).first():
+        referral_code = _generate_referral_code()
+
+    user = User(
+        email=f"{phone.replace('+', '')}@phone.drivebid.local",
+        phone=phone,
+        full_name=payload.full_name,
+        hashed_password=hash_password(secrets.token_hex(16)),
+        role=payload.role,
+        referral_code=referral_code,
+        referred_by=referred_by,
+    )
+    db.add(user)
+    db.commit()
+    db.refresh(user)
+    token = create_access_token(user.id)
+    return Token(access_token=token, user=UserOut.model_validate(user))

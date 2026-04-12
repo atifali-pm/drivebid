@@ -10,8 +10,11 @@ from .routers import disputes as disputes_router
 from .routers import rides as rides_router
 from .ws import manager
 
+from .firebase import init_firebase
+
 Base.metadata.create_all(bind=engine)
 ensure_schema()
+init_firebase()
 
 app = FastAPI(title="DriveBid API", version="0.1.0")
 
