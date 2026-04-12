@@ -184,7 +184,7 @@ export default function RiderDashboard() {
             <input
               type="number"
               min="1"
-              step="10"
+              step="any"
               required
               value={maxBudget}
               onChange={(e) => {

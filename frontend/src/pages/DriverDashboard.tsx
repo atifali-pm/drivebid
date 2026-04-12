@@ -295,7 +295,7 @@ function OpenRideCard({
             <input
               type="number"
               min="1"
-              step="10"
+              step="any"
               required
               placeholder={
                 ride.estimated_fare != null
