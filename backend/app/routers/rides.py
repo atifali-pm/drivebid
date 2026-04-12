@@ -54,6 +54,9 @@ def create_ride(
         pickup_lng=payload.pickup_lng,
         dropoff_lat=payload.dropoff_lat,
         dropoff_lng=payload.dropoff_lng,
+        distance_km=payload.distance_km,
+        duration_min=payload.duration_min,
+        estimated_fare=payload.estimated_fare,
         max_budget=payload.max_budget,
         notes=payload.notes,
     )

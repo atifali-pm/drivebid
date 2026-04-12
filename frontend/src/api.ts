@@ -39,6 +39,9 @@ export interface Ride {
   pickup_lng: number | null;
   dropoff_lat: number | null;
   dropoff_lng: number | null;
+  distance_km: number | null;
+  duration_min: number | null;
+  estimated_fare: number | null;
   max_budget: number;
   notes: string;
   status: RideStatus;
@@ -116,6 +119,9 @@ export const api = {
     pickup_lng?: number | null;
     dropoff_lat?: number | null;
     dropoff_lng?: number | null;
+    distance_km?: number | null;
+    duration_min?: number | null;
+    estimated_fare?: number | null;
     max_budget: number;
     notes?: string;
   }) =>

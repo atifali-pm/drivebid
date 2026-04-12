@@ -4,6 +4,11 @@ import { useAuth } from "../auth";
 import StatusBadge from "../components/StatusBadge";
 import RatingForm from "../components/RatingForm";
 import MiniMap from "../components/MiniMap";
+import {
+  formatDistance,
+  formatDuration,
+  formatMoney,
+} from "../pricing";
 
 export default function DriverDashboard() {
   const { user } = useAuth();
@@ -141,7 +146,7 @@ export default function DriverDashboard() {
                       {ride.pickup} → {ride.dropoff}
                     </p>
                     <p className="text-xs text-slate-500">
-                      Your bid: ${myBid.amount.toFixed(2)} · ETA{" "}
+                      Your bid: {formatMoney(myBid.amount)} · ETA{" "}
                       {myBid.eta_minutes}m · rider {ride.rider_name}
                     </p>
                   </div>
@@ -233,13 +238,42 @@ function OpenRideCard({
         <p className="font-semibold text-slate-800">
           {ride.pickup} → {ride.dropoff}
         </p>
-        <p className="text-sm text-slate-500">
-          {ride.rider_name ?? "Rider"} · max ${ride.max_budget.toFixed(2)}
-          {ride.notes && ` · ${ride.notes}`}
-        </p>
-        <p className="text-xs text-slate-400 mt-1">
-          {ride.bids.length} bid{ride.bids.length === 1 ? "" : "s"} so far
-        </p>
+        <div className="flex flex-wrap items-center gap-x-2 text-sm text-slate-500">
+          <span>{ride.rider_name ?? "Rider"}</span>
+          <span>·</span>
+          <span className="font-medium text-slate-700">
+            Budget {formatMoney(ride.max_budget)}
+          </span>
+          {ride.estimated_fare != null && (
+            <>
+              <span>·</span>
+              <span className="text-sky-600">
+                Est. {formatMoney(ride.estimated_fare)}
+              </span>
+            </>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-x-2 text-xs text-slate-400 mt-0.5">
+          {ride.distance_km != null && (
+            <span>{formatDistance(ride.distance_km)}</span>
+          )}
+          {ride.duration_min != null && (
+            <>
+              <span>·</span>
+              <span>{formatDuration(ride.duration_min)}</span>
+            </>
+          )}
+          {ride.notes && (
+            <>
+              <span>·</span>
+              <span>{ride.notes}</span>
+            </>
+          )}
+          <span>·</span>
+          <span>
+            {ride.bids.length} bid{ride.bids.length === 1 ? "" : "s"}
+          </span>
+        </div>
       </div>
 
       <MiniMap
@@ -251,17 +285,26 @@ function OpenRideCard({
 
       {myBidAmount !== undefined ? (
         <div className="text-sm bg-slate-50 border border-slate-200 rounded-md p-3">
-          You bid <strong>${myBidAmount.toFixed(2)}</strong> on this ride.
+          You bid <strong>{formatMoney(myBidAmount)}</strong> on this ride.
         </div>
       ) : (
         <form onSubmit={handleSubmit} className="space-y-2">
+          {ride.estimated_fare != null && (
+            <p className="text-xs text-sky-600">
+              Suggested bid: {formatMoney(ride.estimated_fare)} (route estimate)
+            </p>
+          )}
           <div className="grid grid-cols-2 gap-2">
             <input
               type="number"
               min="1"
-              step="0.01"
+              step="10"
               required
-              placeholder="Your price"
+              placeholder={
+                ride.estimated_fare != null
+                  ? `~ ${Math.round(ride.estimated_fare)}`
+                  : "Your price (Rs)"
+              }
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
               className="border border-slate-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"

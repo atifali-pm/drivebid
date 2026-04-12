@@ -4,6 +4,13 @@ import StatusBadge from "../components/StatusBadge";
 import RatingForm from "../components/RatingForm";
 import MapPicker, { MapPickerValue } from "../components/MapPicker";
 import MiniMap from "../components/MiniMap";
+import { fetchRoute, RouteEstimate } from "../osrm";
+import {
+  estimateFare,
+  formatDistance,
+  formatDuration,
+  formatMoney,
+} from "../pricing";
 
 const EMPTY_LOCATION: MapPickerValue = {
   pickup: null,
@@ -12,10 +19,19 @@ const EMPTY_LOCATION: MapPickerValue = {
   dropoffLabel: "",
 };
 
+interface Estimate {
+  distanceKm: number;
+  durationMin: number;
+  fare: number;
+}
+
 export default function RiderDashboard() {
   const [rides, setRides] = useState<Ride[]>([]);
   const [location, setLocation] = useState<MapPickerValue>(EMPTY_LOCATION);
+  const [estimate, setEstimate] = useState<Estimate | null>(null);
+  const [estimating, setEstimating] = useState(false);
   const [maxBudget, setMaxBudget] = useState("");
+  const [budgetTouched, setBudgetTouched] = useState(false);
   const [notes, setNotes] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -35,6 +51,35 @@ export default function RiderDashboard() {
     return () => clearInterval(t);
   }, [refresh]);
 
+  useEffect(() => {
+    if (!location.pickup || !location.dropoff) {
+      setEstimate(null);
+      return;
+    }
+    let cancelled = false;
+    setEstimating(true);
+    fetchRoute(location.pickup, location.dropoff).then((route: RouteEstimate | null) => {
+      if (cancelled) return;
+      setEstimating(false);
+      if (!route) {
+        setEstimate(null);
+        return;
+      }
+      const fare = estimateFare(route.distanceKm, route.durationMin);
+      setEstimate({
+        distanceKm: route.distanceKm,
+        durationMin: route.durationMin,
+        fare,
+      });
+      if (!budgetTouched) {
+        setMaxBudget(String(fare));
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [location.pickup, location.dropoff, budgetTouched]);
+
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
     setError(null);
@@ -51,11 +96,16 @@ export default function RiderDashboard() {
         pickup_lng: location.pickup.lng,
         dropoff_lat: location.dropoff.lat,
         dropoff_lng: location.dropoff.lng,
+        distance_km: estimate?.distanceKm ?? null,
+        duration_min: estimate?.durationMin ?? null,
+        estimated_fare: estimate?.fare ?? null,
         max_budget: Number(maxBudget),
         notes,
       });
       setLocation(EMPTY_LOCATION);
+      setEstimate(null);
       setMaxBudget("");
+      setBudgetTouched(false);
       setNotes("");
       refresh();
     } catch (err) {
@@ -100,20 +150,65 @@ export default function RiderDashboard() {
         </h2>
         <form onSubmit={handleCreate} className="space-y-3">
           <MapPicker value={location} onChange={setLocation} />
+
+          {(estimating || estimate) && (
+            <div className="border border-sky-200 bg-sky-50 rounded-lg p-3 text-sm">
+              {estimating && !estimate && (
+                <p className="text-sky-700">Calculating route...</p>
+              )}
+              {estimate && (
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-sky-600 font-semibold mb-1">
+                    Estimated trip
+                  </p>
+                  <div className="flex items-baseline justify-between">
+                    <div>
+                      <p className="text-2xl font-bold text-sky-900">
+                        {formatMoney(estimate.fare)}
+                      </p>
+                      <p className="text-xs text-sky-700">
+                        {formatDistance(estimate.distanceKm)} ·{" "}
+                        {formatDuration(estimate.durationMin)}
+                      </p>
+                    </div>
+                    <p className="text-[10px] text-sky-600 text-right max-w-[140px] leading-tight">
+                      Auto-filled from real driving route. Bump it up for faster pickup.
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
-              Max budget
+              Max budget (Rs)
             </label>
             <input
               type="number"
               min="1"
-              step="0.01"
+              step="10"
               required
               value={maxBudget}
-              onChange={(e) => setMaxBudget(e.target.value)}
+              onChange={(e) => {
+                setMaxBudget(e.target.value);
+                setBudgetTouched(true);
+              }}
               className="w-full border border-slate-300 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-brand"
-              placeholder="25.00"
+              placeholder="Pick pickup + dropoff to auto-fill"
             />
+            {estimate && budgetTouched && (
+              <button
+                type="button"
+                onClick={() => {
+                  setMaxBudget(String(estimate.fare));
+                  setBudgetTouched(false);
+                }}
+                className="text-xs text-brand hover:underline mt-1"
+              >
+                Reset to estimate ({formatMoney(estimate.fare)})
+              </button>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -181,7 +276,11 @@ function RiderRideCard({
             {ride.pickup} → {ride.dropoff}
           </p>
           <p className="text-sm text-slate-500">
-            Max budget: ${ride.max_budget.toFixed(2)}
+            Budget: {formatMoney(ride.max_budget)}
+            {ride.distance_km != null &&
+              ` · ${formatDistance(ride.distance_km)}`}
+            {ride.duration_min != null &&
+              ` · ${formatDuration(ride.duration_min)}`}
             {ride.notes && ` · ${ride.notes}`}
           </p>
         </div>
@@ -198,8 +297,8 @@ function RiderRideCard({
       {acceptedBid && ride.status !== "open" && (
         <div className="mb-3 p-3 rounded-lg bg-sky-50 border border-sky-200 text-sm">
           <p>
-            <strong>{acceptedBid.driver_name}</strong> accepted · $
-            {acceptedBid.amount.toFixed(2)} · ETA {acceptedBid.eta_minutes}m
+            <strong>{acceptedBid.driver_name}</strong> accepted ·{" "}
+            {formatMoney(acceptedBid.amount)} · ETA {acceptedBid.eta_minutes}m
           </p>
           {ride.status === "in_progress" && (
             <p className="text-xs text-sky-700 mt-1">Trip in progress...</p>
@@ -230,7 +329,8 @@ function RiderRideCard({
                 >
                   <div>
                     <p className="font-medium text-slate-800">
-                      {bid.driver_name ?? "Driver"} — ${bid.amount.toFixed(2)}
+                      {bid.driver_name ?? "Driver"} —{" "}
+                      {formatMoney(bid.amount)}
                     </p>
                     <p className="text-xs text-slate-500">
                       ETA {bid.eta_minutes} min

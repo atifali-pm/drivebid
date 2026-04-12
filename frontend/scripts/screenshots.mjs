@@ -85,7 +85,10 @@ async function postRide(riderToken) {
       pickup_lng: PICKUP.lng,
       dropoff_lat: DROPOFF.lat,
       dropoff_lng: DROPOFF.lng,
-      max_budget: 2500,
+      distance_km: 42.3,
+      duration_min: 38,
+      estimated_fare: 1700,
+      max_budget: 1700,
       notes: "2 bags, friendly driver please",
     },
     token: riderToken,
@@ -214,9 +217,9 @@ async function shotRiderLiveBids(browser) {
   const d3 = await registerUser("driver", "bids-3", "Ahmed Raza");
 
   const ride = await postRide(rider.access_token);
-  await placeBid(d1.access_token, ride.id, 2200, 8, "Corolla, AC");
-  await placeBid(d2.access_token, ride.id, 2000, 12, "Civic, clean");
-  await placeBid(d3.access_token, ride.id, 2300, 5, "Alto, closest");
+  await placeBid(d1.access_token, ride.id, 1600, 8, "Corolla, AC");
+  await placeBid(d2.access_token, ride.id, 1500, 12, "Civic, clean");
+  await placeBid(d3.access_token, ride.id, 1650, 5, "Alto, closest");
 
   const { context, page } = await freshPage(browser, rider);
   await page.goto(FRONTEND, { waitUntil: "networkidle" });
@@ -243,7 +246,10 @@ async function shotDriverOpenRides(browser) {
       pickup_lng: 73.0571,
       dropoff_lat: 33.7077,
       dropoff_lng: 73.0499,
-      max_budget: 800,
+      distance_km: 3.2,
+      duration_min: 8,
+      estimated_fare: 350,
+      max_budget: 350,
       notes: "",
     },
   });
@@ -263,7 +269,7 @@ async function shotTripInProgress(browser) {
   const bid = await placeBid(
     driver.access_token,
     ride.id,
-    2100,
+    1600,
     7,
     "Corolla, AC, water available"
   );
@@ -285,7 +291,7 @@ async function shotRating(browser) {
   const bid = await placeBid(
     driver.access_token,
     ride.id,
-    2100,
+    1600,
     7,
     "Corolla, AC"
   );

@@ -39,6 +39,9 @@ class RideCreate(BaseModel):
     pickup_lng: float | None = None
     dropoff_lat: float | None = None
     dropoff_lng: float | None = None
+    distance_km: float | None = None
+    duration_min: float | None = None
+    estimated_fare: float | None = None
     max_budget: float
     notes: str = ""
 
@@ -67,6 +70,9 @@ class RideOut(BaseModel):
     pickup_lng: float | None = None
     dropoff_lat: float | None = None
     dropoff_lng: float | None = None
+    distance_km: float | None = None
+    duration_min: float | None = None
+    estimated_fare: float | None = None
     max_budget: float
     notes: str
     status: RideStatus

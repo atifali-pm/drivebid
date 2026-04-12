@@ -32,6 +32,9 @@ def ensure_schema() -> None:
             "pickup_lng": "FLOAT",
             "dropoff_lat": "FLOAT",
             "dropoff_lng": "FLOAT",
+            "distance_km": "FLOAT",
+            "duration_min": "FLOAT",
+            "estimated_fare": "FLOAT",
         },
     }
     with engine.begin() as conn:
