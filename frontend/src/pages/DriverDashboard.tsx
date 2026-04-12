@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useState } from "react";
 import { api, Ride } from "../api";
 import { useAuth } from "../auth";
 import StatusBadge from "../components/StatusBadge";
@@ -9,6 +9,7 @@ import {
   formatDuration,
   formatMoney,
 } from "../pricing";
+import { useWebSocket } from "../useWebSocket";
 
 export default function DriverDashboard() {
   const { user } = useAuth();
@@ -29,11 +30,7 @@ export default function DriverDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 4000);
-    return () => clearInterval(t);
-  }, [refresh]);
+  useWebSocket(refresh);
 
   async function placeBid(
     rideId: number,

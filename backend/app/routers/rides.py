@@ -1,12 +1,15 @@
 from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user, require_role
 from ..database import get_db
 from ..models import Bid, BidStatus, Ride, RideStatus, User, UserRole
 from ..schemas import BidCreate, BidOut, RatingCreate, RideCreate, RideOut
+from ..ws import manager
+
+REFRESH = {"type": "refresh"}
 
 
 def _accepted_driver_id(ride: Ride) -> int | None:
@@ -43,6 +46,7 @@ def _ride_to_out(ride: Ride) -> RideOut:
 @router.post("", response_model=RideOut, status_code=201)
 def create_ride(
     payload: RideCreate,
+    bg: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_role(UserRole.rider)),
 ):
@@ -63,6 +67,7 @@ def create_ride(
     db.add(ride)
     db.commit()
     db.refresh(ride)
+    bg.add_task(manager.broadcast, REFRESH)
     return _ride_to_out(ride)
 
 
@@ -118,6 +123,7 @@ def get_ride(
 def place_bid(
     ride_id: int,
     payload: BidCreate,
+    bg: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_role(UserRole.driver)),
 ):
@@ -143,6 +149,7 @@ def place_bid(
     db.add(bid)
     db.commit()
     db.refresh(bid)
+    bg.add_task(manager.send_to_user, ride.rider_id, REFRESH)
     return BidOut(
         id=bid.id,
         ride_id=bid.ride_id,
@@ -160,6 +167,7 @@ def place_bid(
 def accept_bid(
     ride_id: int,
     bid_id: int,
+    bg: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_role(UserRole.rider)),
 ):
@@ -177,17 +185,20 @@ def accept_bid(
     bid.status = BidStatus.accepted
     ride.accepted_bid_id = bid.id
     ride.status = RideStatus.accepted
+    driver_ids = [b.driver_id for b in ride.bids]
     for other in ride.bids:
         if other.id != bid.id:
             other.status = BidStatus.rejected
     db.commit()
     db.refresh(ride)
+    bg.add_task(manager.send_to_users, driver_ids, REFRESH)
     return _ride_to_out(ride)
 
 
 @router.post("/{ride_id}/start", response_model=RideOut)
 def start_ride(
     ride_id: int,
+    bg: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_role(UserRole.driver)),
 ):
@@ -202,12 +213,14 @@ def start_ride(
     ride.started_at = datetime.utcnow()
     db.commit()
     db.refresh(ride)
+    bg.add_task(manager.send_to_user, ride.rider_id, REFRESH)
     return _ride_to_out(ride)
 
 
 @router.post("/{ride_id}/complete", response_model=RideOut)
 def complete_ride(
     ride_id: int,
+    bg: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(require_role(UserRole.driver)),
 ):
@@ -222,12 +235,14 @@ def complete_ride(
     ride.completed_at = datetime.utcnow()
     db.commit()
     db.refresh(ride)
+    bg.add_task(manager.send_to_user, ride.rider_id, REFRESH)
     return _ride_to_out(ride)
 
 
 @router.post("/{ride_id}/cancel", response_model=RideOut)
 def cancel_ride(
     ride_id: int,
+    bg: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -245,8 +260,17 @@ def cancel_ride(
     ride.status = RideStatus.cancelled
     ride.cancelled_at = datetime.utcnow()
     ride.cancelled_by = "rider" if is_rider else "driver"
+    notify_ids = []
+    if is_rider:
+        driver = _accepted_driver_id(ride)
+        if driver:
+            notify_ids.append(driver)
+    else:
+        notify_ids.append(ride.rider_id)
     db.commit()
     db.refresh(ride)
+    bg.add_task(manager.send_to_users, notify_ids, REFRESH)
+    bg.add_task(manager.broadcast, REFRESH)
     return _ride_to_out(ride)
 
 
@@ -254,6 +278,7 @@ def cancel_ride(
 def rate_ride(
     ride_id: int,
     payload: RatingCreate,
+    bg: BackgroundTasks,
     db: Session = Depends(get_db),
     user: User = Depends(get_current_user),
 ):
@@ -278,6 +303,9 @@ def rate_ride(
         ride.driver_to_rider_comment = payload.comment
     else:
         raise HTTPException(status_code=403, detail="Not a participant of this ride")
+    other_id = _accepted_driver_id(ride) if user.id == ride.rider_id else ride.rider_id
     db.commit()
     db.refresh(ride)
+    if other_id:
+        bg.add_task(manager.send_to_user, other_id, REFRESH)
     return _ride_to_out(ride)

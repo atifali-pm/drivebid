@@ -11,6 +11,7 @@ import {
   formatDuration,
   formatMoney,
 } from "../pricing";
+import { useWebSocket } from "../useWebSocket";
 
 const EMPTY_LOCATION: MapPickerValue = {
   pickup: null,
@@ -45,11 +46,7 @@ export default function RiderDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    refresh();
-    const t = setInterval(refresh, 4000);
-    return () => clearInterval(t);
-  }, [refresh]);
+  useWebSocket(refresh);
 
   useEffect(() => {
     if (!location.pickup || !location.dropoff) {
