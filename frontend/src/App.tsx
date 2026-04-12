@@ -4,7 +4,21 @@ import Login from "./pages/Login";
 import Register from "./pages/Register";
 import RiderDashboard from "./pages/RiderDashboard";
 import DriverDashboard from "./pages/DriverDashboard";
+import AdminDashboard from "./pages/AdminDashboard";
 import Layout from "./components/Layout";
+
+function DashboardForRole({ role }: { role: string }) {
+  switch (role) {
+    case "rider":
+      return <RiderDashboard />;
+    case "driver":
+      return <DriverDashboard />;
+    case "admin":
+      return <AdminDashboard />;
+    default:
+      return <RiderDashboard />;
+  }
+}
 
 export default function App() {
   const { user } = useAuth();
@@ -26,7 +40,7 @@ export default function App() {
             <Navigate to="/login" replace />
           ) : (
             <Layout>
-              {user.role === "rider" ? <RiderDashboard /> : <DriverDashboard />}
+              <DashboardForRole role={user.role} />
             </Layout>
           )
         }

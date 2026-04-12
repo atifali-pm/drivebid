@@ -1,6 +1,6 @@
 const API_BASE = "http://drivebid.local:8050";
 
-export type UserRole = "rider" | "driver";
+export type UserRole = "rider" | "driver" | "admin";
 
 export interface User {
   id: number;
@@ -162,4 +162,16 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ stars, comment }),
     }),
+
+  // Admin
+  adminStats: () => request<AdminStats>("/admin/stats"),
+  adminUsers: () => request<User[]>("/admin/users"),
+  adminRides: () => request<Ride[]>("/admin/rides"),
 };
+
+export interface AdminStats {
+  users: { total: number; riders: number; drivers: number };
+  rides: { total: number; open: number; active: number; completed: number; cancelled: number };
+  bids: { total: number };
+  revenue: { total: number };
+}

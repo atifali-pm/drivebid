@@ -10,6 +10,7 @@ from .database import Base
 class UserRole(str, PyEnum):
     rider = "rider"
     driver = "driver"
+    admin = "admin"
 
 
 class RideStatus(str, PyEnum):

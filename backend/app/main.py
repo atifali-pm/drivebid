@@ -4,6 +4,7 @@ from jose import JWTError, jwt
 
 from .config import settings
 from .database import Base, engine, ensure_schema
+from .routers import admin as admin_router
 from .routers import auth as auth_router
 from .routers import rides as rides_router
 from .ws import manager
@@ -25,6 +26,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(admin_router.router)
 app.include_router(auth_router.router)
 app.include_router(rides_router.router)
 
