@@ -36,6 +36,18 @@ def ensure_schema() -> None:
             "duration_min": "FLOAT",
             "estimated_fare": "FLOAT",
         },
+        "users": {
+            "phone": "VARCHAR",
+            "is_online": "INTEGER DEFAULT 0",
+            "is_verified": "INTEGER DEFAULT 0",
+            "cnic_number": "VARCHAR",
+            "license_number": "VARCHAR",
+            "vehicle_plate": "VARCHAR",
+            "vehicle_model": "VARCHAR",
+            "vehicle_color": "VARCHAR",
+            "referral_code": "VARCHAR",
+            "referred_by": "INTEGER",
+        },
     }
     with engine.begin() as conn:
         for table, cols in expected_columns.items():

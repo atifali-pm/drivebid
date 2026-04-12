@@ -5,8 +5,9 @@ from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user, require_role
 from ..database import get_db
-from ..models import Bid, BidStatus, Ride, RideStatus, User, UserRole
+from ..models import Bid, BidStatus, DriverLocation, Ride, RideStatus, User, UserRole
 from ..schemas import BidCreate, BidOut, RatingCreate, RideCreate, RideOut
+from ..pricing import format_money
 from ..ws import manager
 
 REFRESH = {"type": "refresh"}
@@ -309,3 +310,108 @@ def rate_ride(
     if other_id:
         bg.add_task(manager.send_to_user, other_id, REFRESH)
     return _ride_to_out(ride)
+
+
+@router.get("/{ride_id}/receipt")
+def get_receipt(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ride = db.get(Ride, ride_id)
+    if ride is None:
+        raise HTTPException(status_code=404, detail="Ride not found")
+    if ride.status != RideStatus.completed:
+        raise HTTPException(status_code=400, detail="Ride not yet completed")
+    if user.id != ride.rider_id and _accepted_driver_id(ride) != user.id:
+        raise HTTPException(status_code=403, detail="Not a participant")
+
+    accepted = None
+    driver_name = None
+    for b in ride.bids:
+        if b.id == ride.accepted_bid_id:
+            accepted = b
+            driver_name = b.driver.full_name if b.driver else None
+            break
+
+    fare = accepted.amount if accepted else ride.max_budget
+    from ..pricing import PRICING
+
+    commission = round(fare * PRICING["platform_commission_pct"] / 100, 2)
+    driver_earnings = round(fare - commission, 2)
+
+    return {
+        "ride_id": ride.id,
+        "pickup": ride.pickup,
+        "dropoff": ride.dropoff,
+        "distance_km": ride.distance_km,
+        "duration_min": ride.duration_min,
+        "rider_name": ride.rider.full_name if ride.rider else None,
+        "driver_name": driver_name,
+        "fare": fare,
+        "fare_formatted": format_money(fare),
+        "platform_commission_pct": PRICING["platform_commission_pct"],
+        "platform_commission": commission,
+        "driver_earnings": driver_earnings,
+        "started_at": ride.started_at.isoformat() if ride.started_at else None,
+        "completed_at": ride.completed_at.isoformat() if ride.completed_at else None,
+        "rider_rating": ride.rider_to_driver_stars,
+        "driver_rating": ride.driver_to_rider_stars,
+    }
+
+
+@router.post("/{ride_id}/driver-location")
+def update_driver_location(
+    ride_id: int,
+    lat: float,
+    lng: float,
+    bg: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.driver)),
+):
+    ride = db.get(Ride, ride_id)
+    if ride is None:
+        raise HTTPException(status_code=404, detail="Ride not found")
+    if _accepted_driver_id(ride) != user.id:
+        raise HTTPException(status_code=403, detail="Not the accepted driver")
+    if ride.status not in (RideStatus.accepted, RideStatus.in_progress):
+        raise HTTPException(status_code=400, detail="Ride not active")
+
+    loc = db.get(DriverLocation, user.id)
+    if loc:
+        loc.lat = lat
+        loc.lng = lng
+        loc.updated_at = datetime.utcnow()
+    else:
+        loc = DriverLocation(driver_id=user.id, lat=lat, lng=lng)
+        db.add(loc)
+    db.commit()
+
+    bg.add_task(
+        manager.send_to_user,
+        ride.rider_id,
+        {"type": "driver_location", "lat": lat, "lng": lng},
+    )
+    return {"status": "ok"}
+
+
+@router.get("/{ride_id}/driver-location")
+def get_driver_location(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ride = db.get(Ride, ride_id)
+    if ride is None:
+        raise HTTPException(status_code=404, detail="Ride not found")
+    if user.id != ride.rider_id:
+        raise HTTPException(status_code=403, detail="Only the rider can view this")
+
+    driver_id = _accepted_driver_id(ride)
+    if not driver_id:
+        return {"lat": None, "lng": None}
+
+    loc = db.get(DriverLocation, driver_id)
+    if not loc:
+        return {"lat": None, "lng": None}
+    return {"lat": loc.lat, "lng": loc.lng, "updated_at": loc.updated_at.isoformat()}

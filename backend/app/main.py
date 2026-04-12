@@ -6,6 +6,7 @@ from .config import settings
 from .database import Base, engine, ensure_schema
 from .routers import admin as admin_router
 from .routers import auth as auth_router
+from .routers import disputes as disputes_router
 from .routers import rides as rides_router
 from .ws import manager
 
@@ -28,6 +29,7 @@ app.add_middleware(
 
 app.include_router(admin_router.router)
 app.include_router(auth_router.router)
+app.include_router(disputes_router.router)
 app.include_router(rides_router.router)
 
 
@@ -61,7 +63,31 @@ async def websocket_endpoint(ws: WebSocket, token: str = Query(...)):
     await manager.connect(user_id, ws)
     try:
         while True:
-            await ws.receive_text()
+            raw = await ws.receive_text()
+            # Handle driver location updates sent over WS for low latency
+            try:
+                import json
+                msg = json.loads(raw)
+                if msg.get("type") == "driver_location":
+                    lat = msg["lat"]
+                    lng = msg["lng"]
+                    ride_id = msg.get("ride_id")
+                    if ride_id:
+                        # Broadcast to rider
+                        from .database import SessionLocal
+                        from .models import Ride
+                        db = SessionLocal()
+                        try:
+                            ride = db.get(Ride, ride_id)
+                            if ride:
+                                await manager.send_to_user(
+                                    ride.rider_id,
+                                    {"type": "driver_location", "lat": lat, "lng": lng},
+                                )
+                        finally:
+                            db.close()
+            except (ValueError, KeyError):
+                pass
     except WebSocketDisconnect:
         pass
     finally:

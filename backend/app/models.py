@@ -32,9 +32,19 @@ class User(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
+    phone: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
     full_name: Mapped[str] = mapped_column(String, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
+    is_online: Mapped[bool] = mapped_column(Integer, default=False, server_default="0")
+    is_verified: Mapped[bool] = mapped_column(Integer, default=False, server_default="0")
+    cnic_number: Mapped[str | None] = mapped_column(String, nullable=True)
+    license_number: Mapped[str | None] = mapped_column(String, nullable=True)
+    vehicle_plate: Mapped[str | None] = mapped_column(String, nullable=True)
+    vehicle_model: Mapped[str | None] = mapped_column(String, nullable=True)
+    vehicle_color: Mapped[str | None] = mapped_column(String, nullable=True)
+    referral_code: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
+    referred_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     rides: Mapped[list["Ride"]] = relationship(back_populates="rider", foreign_keys="Ride.rider_id")
@@ -91,3 +101,36 @@ class Bid(Base):
 
     ride: Mapped["Ride"] = relationship(back_populates="bids", foreign_keys=[ride_id])
     driver: Mapped["User"] = relationship(back_populates="bids")
+
+
+class DriverLocation(Base):
+    __tablename__ = "driver_locations"
+
+    driver_id: Mapped[int] = mapped_column(ForeignKey("users.id"), primary_key=True)
+    lat: Mapped[float] = mapped_column(Float, nullable=False)
+    lng: Mapped[float] = mapped_column(Float, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class Dispute(Base):
+    __tablename__ = "disputes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ride_id: Mapped[int] = mapped_column(ForeignKey("rides.id"), nullable=False)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    category: Mapped[str] = mapped_column(String, nullable=False)
+    description: Mapped[str] = mapped_column(String, nullable=False)
+    status: Mapped[str] = mapped_column(String, default="open")
+    admin_response: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class OTP(Base):
+    __tablename__ = "otps"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    phone: Mapped[str] = mapped_column(String, nullable=False, index=True)
+    code: Mapped[str] = mapped_column(String, nullable=False)
+    expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
+    used: Mapped[bool] = mapped_column(Integer, default=False)
