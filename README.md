@@ -155,25 +155,6 @@ Both sides rate each other. One rating per side, locked once submitted.
 
 ---
 
-## Tech stack
-
-<details>
-<summary>Click to expand</summary>
-
-| Layer | Choice |
-|---|---|
-| Backend | FastAPI + SQLAlchemy |
-| Database | SQLite (swappable to PostgreSQL via one env var) |
-| Frontend | React 18 + TypeScript + Vite + Tailwind CSS |
-| Maps | Leaflet + react-leaflet |
-| Tiles | OpenStreetMap — free, no key |
-| Geocoding | Photon (komoot) — free, no key |
-| Auth | JWT bearer tokens + bcrypt |
-
-No paid services, no API keys, no vendor lock-in.
-
-</details>
-
 ## Running locally
 
 <details>

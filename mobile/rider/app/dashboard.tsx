@@ -9,10 +9,81 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { api, Ride } from "../src/api";
 import { useAuth } from "../src/useAuth";
 import { formatDistance, formatDuration, formatMoney } from "../src/pricing";
+import { DisputeModal } from "../src/DisputeModal";
+
+// Flip to true to render hardcoded data for portfolio screenshots. Leave false for normal use.
+const SCREENSHOT_MODE = false;
+
+const MOCK_USER_NAME = "Sara Ahmed";
+
+const MOCK_RIDES: Ride[] = [
+  {
+    id: 101,
+    rider_id: 1,
+    rider_name: MOCK_USER_NAME,
+    pickup: "F-7 Markaz",
+    dropoff: "G-9/4",
+    pickup_lat: 33.7215,
+    pickup_lng: 73.0433,
+    dropoff_lat: 33.6849,
+    dropoff_lng: 73.0247,
+    distance_km: 6.8,
+    duration_min: 16,
+    estimated_fare: 1450,
+    max_budget: 2000,
+    notes: "",
+    status: "open",
+    accepted_bid_id: null,
+    started_at: null,
+    completed_at: null,
+    cancelled_at: null,
+    cancelled_by: null,
+    rider_to_driver_stars: null,
+    rider_to_driver_comment: null,
+    driver_to_rider_stars: null,
+    driver_to_rider_comment: null,
+    created_at: "2026-04-14T12:00:00Z",
+    bids: [
+      { id: 1, ride_id: 101, driver_id: 2, driver_name: "Bilal Hussain", amount: 1500, eta_minutes: 4, message: "On my way", status: "pending", created_at: "" },
+      { id: 2, ride_id: 101, driver_id: 3, driver_name: "Ahmed Raza", amount: 1650, eta_minutes: 3, message: "AC sedan", status: "pending", created_at: "" },
+      { id: 3, ride_id: 101, driver_id: 4, driver_name: "Imran Khan", amount: 1700, eta_minutes: 6, message: "", status: "pending", created_at: "" },
+    ],
+  },
+  {
+    id: 102,
+    rider_id: 1,
+    rider_name: MOCK_USER_NAME,
+    pickup: "DHA Phase 2",
+    dropoff: "Centaurus Mall",
+    pickup_lat: null,
+    pickup_lng: null,
+    dropoff_lat: null,
+    dropoff_lng: null,
+    distance_km: 9.2,
+    duration_min: 22,
+    estimated_fare: 1600,
+    max_budget: 1800,
+    notes: "",
+    status: "completed",
+    accepted_bid_id: 4,
+    started_at: "2026-04-14T10:00:00Z",
+    completed_at: "2026-04-14T10:24:00Z",
+    cancelled_at: null,
+    cancelled_by: null,
+    rider_to_driver_stars: null,
+    rider_to_driver_comment: null,
+    driver_to_rider_stars: null,
+    driver_to_rider_comment: null,
+    created_at: "2026-04-14T09:55:00Z",
+    bids: [
+      { id: 4, ride_id: 102, driver_id: 5, driver_name: "Fatima Sheikh", amount: 1550, eta_minutes: 5, message: "", status: "accepted", created_at: "" },
+    ],
+  },
+];
 
 const STATUS_COLORS: Record<string, string> = {
   open: "#10b981",
@@ -25,19 +96,33 @@ const STATUS_COLORS: Record<string, string> = {
 export default function Dashboard() {
   const { user, logout } = useAuth();
   const router = useRouter();
-  const [rides, setRides] = useState<Ride[]>([]);
+  const params = useLocalSearchParams<{ show?: string }>();
+  const filteredMock =
+    SCREENSHOT_MODE && params.show === "bids"
+      ? MOCK_RIDES.filter((r) => r.status === "open")
+      : SCREENSHOT_MODE && params.show === "rating"
+      ? MOCK_RIDES.filter((r) => r.status === "completed")
+      : SCREENSHOT_MODE
+      ? MOCK_RIDES
+      : [];
+  const [rides, setRides] = useState<Ride[]>(filteredMock);
   const [refreshing, setRefreshing] = useState(false);
   const [showForm, setShowForm] = useState(false);
 
   const refresh = useCallback(async () => {
+    if (SCREENSHOT_MODE) {
+      setRides(filteredMock);
+      return;
+    }
     try {
       setRides(await api.listMyRides());
     } catch {
       /* ignore */
     }
-  }, []);
+  }, [filteredMock]);
 
   useEffect(() => {
+    if (SCREENSHOT_MODE) return;
     refresh();
     const t = setInterval(refresh, 5000);
     return () => clearInterval(t);
@@ -59,7 +144,9 @@ export default function Dashboard() {
       <View style={styles.header}>
         <View>
           <Text style={styles.brand}>DriveBid</Text>
-          <Text style={styles.subBrand}>{user?.full_name} · Rider</Text>
+          <Text style={styles.subBrand}>
+            {user?.full_name ?? MOCK_USER_NAME} · Rider
+          </Text>
         </View>
         <Pressable onPress={handleLogout} style={styles.logoutBtn}>
           <Text style={styles.logoutText}>Logout</Text>
@@ -68,11 +155,9 @@ export default function Dashboard() {
 
       <Pressable
         style={styles.newRideBtn}
-        onPress={() => setShowForm(!showForm)}
+        onPress={() => router.push("/post-ride")}
       >
-        <Text style={styles.newRideText}>
-          {showForm ? "Cancel" : "+ Post New Ride"}
-        </Text>
+        <Text style={styles.newRideText}>+ Post New Ride</Text>
       </Pressable>
 
       {showForm && (
@@ -174,6 +259,8 @@ function RideCard({
   ride: Ride;
   onAction: () => void;
 }) {
+  const router = useRouter();
+  const [disputeOpen, setDisputeOpen] = useState(false);
   const accepted = ride.bids.find((b) => b.id === ride.accepted_bid_id);
 
   async function acceptBid(bidId: number) {
@@ -227,12 +314,40 @@ function RideCard({
       </View>
 
       {accepted && ride.status !== "open" && (
-        <View style={styles.acceptedBar}>
-          <Text style={styles.acceptedText}>
-            {accepted.driver_name} · {formatMoney(accepted.amount)} · ETA{" "}
-            {accepted.eta_minutes}m
-          </Text>
-        </View>
+        <>
+          <View style={styles.acceptedBar}>
+            <Text style={styles.acceptedText}>
+              {accepted.driver_vehicle_type === "motorcycle" ? "🏍️" : accepted.driver_vehicle_type === "rickshaw" ? "🛺" : accepted.driver_vehicle_type === "van" ? "🚐" : "🚗"}{" "}
+              {accepted.driver_name} · {formatMoney(accepted.amount)} · ETA{" "}
+              {accepted.eta_minutes}m
+            </Text>
+            {accepted.driver_vehicle_plate && (
+              <Text style={styles.plateText}>
+                {accepted.driver_vehicle_model ?? ""} · {accepted.driver_vehicle_plate}
+              </Text>
+            )}
+          </View>
+          {(ride.status === "accepted" || ride.status === "in_progress") && (
+            <View style={{ flexDirection: "row", gap: 8, marginTop: 10 }}>
+              <Pressable
+                style={[styles.trackBtn, { flex: 1 }]}
+                onPress={() => router.push(`/trip-map?rideId=${ride.id}`)}
+              >
+                <Text style={styles.trackBtnText}>Track on map</Text>
+              </Pressable>
+              <Pressable
+                style={[styles.chatDashBtn, { flex: 1 }]}
+                onPress={() =>
+                  router.push(
+                    `/chat?rideId=${ride.id}&otherName=${encodeURIComponent(accepted?.driver_name ?? "Driver")}`
+                  )
+                }
+              >
+                <Text style={styles.chatDashTxt}>Chat</Text>
+              </Pressable>
+            </View>
+          )}
+        </>
       )}
 
       {ride.status === "open" && ride.bids.length > 0 && (
@@ -246,6 +361,7 @@ function RideCard({
               <View key={bid.id} style={styles.bidRow}>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.bidDriver}>
+                    {bid.driver_vehicle_type === "motorcycle" ? "🏍️" : bid.driver_vehicle_type === "rickshaw" ? "🛺" : bid.driver_vehicle_type === "van" ? "🚐" : "🚗"}{" "}
                     {bid.driver_name ?? "Driver"} — {formatMoney(bid.amount)}
                   </Text>
                   <Text style={styles.bidMeta}>
@@ -284,11 +400,29 @@ function RideCard({
         </Text>
       )}
 
+      {ride.status === "completed" && accepted && (
+        <View style={styles.paidRow}>
+          <Text style={styles.paidText}>
+            ✓ Paid {formatMoney(accepted.amount)} to {accepted.driver_name}
+          </Text>
+          <Pressable onPress={() => setDisputeOpen(true)}>
+            <Text style={styles.reportLink}>Report issue</Text>
+          </Pressable>
+        </View>
+      )}
+
       {(ride.status === "open" || ride.status === "accepted") && (
         <Pressable onPress={cancel}>
           <Text style={styles.cancelLink}>Cancel ride</Text>
         </Pressable>
       )}
+
+      <DisputeModal
+        visible={disputeOpen}
+        rideId={ride.id}
+        role="rider"
+        onClose={() => setDisputeOpen(false)}
+      />
     </View>
   );
 }
@@ -371,6 +505,7 @@ const styles = StyleSheet.create({
     borderColor: "#bfdbfe",
   },
   acceptedText: { fontSize: 13, color: "#1e3a5f" },
+  plateText: { fontSize: 11, color: "#3b82f6", fontWeight: "700", marginTop: 4 },
   bids: { marginTop: 10 },
   bidsLabel: {
     fontSize: 11,
@@ -403,4 +538,49 @@ const styles = StyleSheet.create({
   star: { fontSize: 28, color: "#fbbf24" },
   rated: { fontSize: 12, color: "#94a3b8", marginTop: 8 },
   cancelLink: { color: "#ef4444", fontSize: 12, marginTop: 10 },
+  paidRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginTop: 10,
+    backgroundColor: "#ecfdf5",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
+  },
+  paidText: { color: "#047857", fontSize: 12, fontWeight: "700" },
+  reportLink: { color: "#dc2626", fontSize: 11, fontWeight: "600" },
+  trackBtn: {
+    backgroundColor: "#06b6d4",
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+  },
+  trackBtnText: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  chatDashBtn: {
+    backgroundColor: "#eff6ff",
+    borderRadius: 10,
+    padding: 12,
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#93c5fd",
+  },
+  chatDashTxt: { color: "#1d4ed8", fontWeight: "700", fontSize: 14 },
+  quickRow: {
+    flexDirection: "row",
+    gap: 8,
+    marginHorizontal: 16,
+    marginBottom: 4,
+  },
+  quickChip: {
+    backgroundColor: "#ecfeff",
+    borderWidth: 1,
+    borderColor: "#a5f3fc",
+    borderRadius: 16,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+  },
+  quickChipText: { color: "#0891b2", fontSize: 12, fontWeight: "600" },
 });

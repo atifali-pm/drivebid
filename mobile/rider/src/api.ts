@@ -3,7 +3,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 // Change this to your machine's LAN IP when testing via Expo Go on a phone.
 // "localhost" only works on emulator. On a physical device, use your
 // computer's LAN IP, e.g. "http://192.168.1.42:8050"
-export const API_BASE = "http://drivebid.local:8050";
+export const API_BASE = "https://amusing-handcart-viewer.ngrok-free.dev";
 
 export type UserRole = "rider" | "driver" | "admin";
 export type RideStatus =
@@ -26,6 +26,12 @@ export interface Bid {
   ride_id: number;
   driver_id: number;
   driver_name: string | null;
+  driver_phone: string | null;
+  driver_vehicle_type: string | null;
+  driver_vehicle_model: string | null;
+  driver_vehicle_plate: string | null;
+  driver_rating: number | null;
+  driver_trip_count: number;
   amount: number;
   eta_minutes: number;
   message: string;
@@ -47,6 +53,7 @@ export interface Ride {
   duration_min: number | null;
   estimated_fare: number | null;
   max_budget: number;
+  ride_type: string;
   notes: string;
   status: RideStatus;
   accepted_bid_id: number | null;
@@ -60,6 +67,26 @@ export interface Ride {
   driver_to_rider_comment: string | null;
   created_at: string;
   bids: Bid[];
+}
+
+export type DisputeCategory =
+  | "driver_behavior"
+  | "rider_behavior"
+  | "route_issue"
+  | "payment_issue"
+  | "safety"
+  | "other";
+
+export interface Dispute {
+  id: number;
+  ride_id: number;
+  user_id: number;
+  category: string;
+  description: string;
+  status: string;
+  admin_response: string | null;
+  created_at: string;
+  resolved_at: string | null;
 }
 
 export interface TokenResponse {
@@ -148,6 +175,7 @@ export const api = {
     duration_min?: number | null;
     estimated_fare?: number | null;
     max_budget: number;
+    ride_type?: string;
     notes?: string;
   }) =>
     request<Ride>("/rides", { method: "POST", body: JSON.stringify(data) }),
@@ -182,4 +210,27 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ stars, comment }),
     }),
+
+  createDispute: (data: {
+    ride_id: number;
+    category: DisputeCategory;
+    description: string;
+  }) =>
+    request<Dispute>("/disputes", {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  listMyDisputes: () => request<Dispute[]>("/disputes/mine"),
+
+  sendMessage: (rideId: number, content: string) =>
+    request<{ id: number; content: string; sender_name: string; created_at: string }>(
+      `/rides/${rideId}/messages`,
+      { method: "POST", body: JSON.stringify({ content }) }
+    ),
+
+  listMessages: (rideId: number) =>
+    request<
+      { id: number; sender_id: number; sender_name: string; content: string; msg_type: string; created_at: string }[]
+    >(`/rides/${rideId}/messages`),
 };

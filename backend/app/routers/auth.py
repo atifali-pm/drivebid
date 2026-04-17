@@ -14,6 +14,7 @@ from ..schemas import (
     DriverVerification,
     PhoneOTPRequest,
     PhoneOTPVerify,
+    ProfileUpdate,
     Token,
     UserCreate,
     UserLogin,
@@ -162,6 +163,19 @@ def verify_driver(
 
 @router.get("/me", response_model=UserOut)
 def get_me(user: User = Depends(get_current_user)):
+    return UserOut.model_validate(user)
+
+
+@router.patch("/profile", response_model=UserOut)
+def update_profile(
+    payload: ProfileUpdate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    for field, value in payload.model_dump(exclude_unset=True).items():
+        setattr(user, field, value)
+    db.commit()
+    db.refresh(user)
     return UserOut.model_validate(user)
 
 

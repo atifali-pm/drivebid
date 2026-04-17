@@ -1,11 +1,12 @@
 from datetime import datetime
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user, require_role
 from ..database import get_db
-from ..models import Bid, BidStatus, DriverLocation, Ride, RideStatus, User, UserRole
+from ..models import Bid, BidStatus, DriverLocation, HiddenRide, Message, Ride, RideStatus, User, UserRole
 from ..schemas import BidCreate, BidOut, RatingCreate, RideCreate, RideOut
 from ..pricing import format_money
 from ..ws import manager
@@ -24,23 +25,47 @@ def _accepted_driver_id(ride: Ride) -> int | None:
 router = APIRouter(prefix="/rides", tags=["rides"])
 
 
-def _ride_to_out(ride: Ride) -> RideOut:
+def _driver_stats(driver_id: int, db) -> tuple[float | None, int]:
+    """Return (avg_rating, trip_count) for a driver."""
+    from sqlalchemy import func
+    result = db.query(
+        func.avg(Ride.rider_to_driver_stars),
+        func.count(Ride.id),
+    ).join(Bid, Bid.ride_id == Ride.id).filter(
+        Bid.driver_id == driver_id,
+        Ride.accepted_bid_id == Bid.id,
+        Ride.status == RideStatus.completed,
+    ).first()
+    avg_rating = round(result[0], 1) if result[0] is not None else None
+    trip_count = result[1] or 0
+    return avg_rating, trip_count
+
+
+def _ride_to_out(ride: Ride, db=None) -> RideOut:
     data = RideOut.model_validate(ride)
     data.rider_name = ride.rider.full_name if ride.rider else None
-    data.bids = [
-        BidOut(
+    data.bids = []
+    for b in ride.bids:
+        rating, trips = (None, 0)
+        if db and b.driver:
+            rating, trips = _driver_stats(b.driver_id, db)
+        data.bids.append(BidOut(
             id=b.id,
             ride_id=b.ride_id,
             driver_id=b.driver_id,
             driver_name=b.driver.full_name if b.driver else None,
+            driver_phone=b.driver.phone if b.driver else None,
+            driver_vehicle_type=b.driver.vehicle_type if b.driver else None,
+            driver_vehicle_model=b.driver.vehicle_model if b.driver else None,
+            driver_vehicle_plate=b.driver.vehicle_plate if b.driver else None,
+            driver_rating=rating,
+            driver_trip_count=trips,
             amount=b.amount,
             eta_minutes=b.eta_minutes,
             message=b.message,
             status=b.status,
             created_at=b.created_at,
-        )
-        for b in ride.bids
-    ]
+        ))
     return data
 
 
@@ -63,13 +88,14 @@ def create_ride(
         duration_min=payload.duration_min,
         estimated_fare=payload.estimated_fare,
         max_budget=payload.max_budget,
+        ride_type=payload.ride_type,
         notes=payload.notes,
     )
     db.add(ride)
     db.commit()
     db.refresh(ride)
     bg.add_task(manager.broadcast, REFRESH)
-    return _ride_to_out(ride)
+    return _ride_to_out(ride, db)
 
 
 @router.get("/open", response_model=list[RideOut])
@@ -77,14 +103,78 @@ def list_open_rides(
     db: Session = Depends(get_db),
     user: User = Depends(require_role(UserRole.driver)),
 ):
+    hidden_ids = (
+        db.query(HiddenRide.ride_id)
+        .filter(HiddenRide.driver_id == user.id)
+        .subquery()
+    )
     rides = (
         db.query(Ride)
         .options(joinedload(Ride.rider), joinedload(Ride.bids).joinedload(Bid.driver))
         .filter(Ride.status == RideStatus.open)
+        .filter(Ride.id.notin_(hidden_ids))
         .order_by(Ride.created_at.desc())
         .all()
     )
-    return [_ride_to_out(r) for r in rides]
+    return [_ride_to_out(r, db) for r in rides]
+
+
+@router.post("/{ride_id}/hide")
+def hide_ride(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.driver)),
+):
+    ride = db.get(Ride, ride_id)
+    if ride is None:
+        raise HTTPException(status_code=404, detail="Ride not found")
+    existing = (
+        db.query(HiddenRide)
+        .filter(HiddenRide.driver_id == user.id, HiddenRide.ride_id == ride_id)
+        .first()
+    )
+    if not existing:
+        db.add(HiddenRide(driver_id=user.id, ride_id=ride_id))
+        db.commit()
+    return {"status": "hidden"}
+
+
+@router.delete("/{ride_id}/hide")
+def unhide_ride(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.driver)),
+):
+    hidden = (
+        db.query(HiddenRide)
+        .filter(HiddenRide.driver_id == user.id, HiddenRide.ride_id == ride_id)
+        .first()
+    )
+    if hidden:
+        db.delete(hidden)
+        db.commit()
+    return {"status": "restored"}
+
+
+@router.get("/hidden", response_model=list[RideOut])
+def list_hidden_rides(
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.driver)),
+):
+    hidden_ids = (
+        db.query(HiddenRide.ride_id)
+        .filter(HiddenRide.driver_id == user.id)
+        .subquery()
+    )
+    rides = (
+        db.query(Ride)
+        .options(joinedload(Ride.rider), joinedload(Ride.bids).joinedload(Bid.driver))
+        .filter(Ride.status == RideStatus.open)
+        .filter(Ride.id.in_(hidden_ids))
+        .order_by(Ride.created_at.desc())
+        .all()
+    )
+    return [_ride_to_out(r, db) for r in rides]
 
 
 @router.get("/mine", response_model=list[RideOut])
@@ -100,7 +190,7 @@ def list_my_rides(
     else:
         query = query.join(Bid, Bid.ride_id == Ride.id).filter(Bid.driver_id == user.id)
     rides = query.order_by(Ride.created_at.desc()).all()
-    return [_ride_to_out(r) for r in rides]
+    return [_ride_to_out(r, db) for r in rides]
 
 
 @router.get("/{ride_id}", response_model=RideOut)
@@ -117,7 +207,7 @@ def get_ride(
     )
     if ride is None:
         raise HTTPException(status_code=404, detail="Ride not found")
-    return _ride_to_out(ride)
+    return _ride_to_out(ride, db)
 
 
 @router.post("/{ride_id}/bids", response_model=BidOut, status_code=201)
@@ -156,6 +246,9 @@ def place_bid(
         ride_id=bid.ride_id,
         driver_id=bid.driver_id,
         driver_name=user.full_name,
+        driver_vehicle_type=user.vehicle_type,
+        driver_vehicle_model=user.vehicle_model,
+        driver_vehicle_plate=user.vehicle_plate,
         amount=bid.amount,
         eta_minutes=bid.eta_minutes,
         message=bid.message,
@@ -193,7 +286,7 @@ def accept_bid(
     db.commit()
     db.refresh(ride)
     bg.add_task(manager.send_to_users, driver_ids, REFRESH)
-    return _ride_to_out(ride)
+    return _ride_to_out(ride, db)
 
 
 @router.post("/{ride_id}/start", response_model=RideOut)
@@ -215,7 +308,7 @@ def start_ride(
     db.commit()
     db.refresh(ride)
     bg.add_task(manager.send_to_user, ride.rider_id, REFRESH)
-    return _ride_to_out(ride)
+    return _ride_to_out(ride, db)
 
 
 @router.post("/{ride_id}/complete", response_model=RideOut)
@@ -237,7 +330,7 @@ def complete_ride(
     db.commit()
     db.refresh(ride)
     bg.add_task(manager.send_to_user, ride.rider_id, REFRESH)
-    return _ride_to_out(ride)
+    return _ride_to_out(ride, db)
 
 
 @router.post("/{ride_id}/cancel", response_model=RideOut)
@@ -272,7 +365,7 @@ def cancel_ride(
     db.refresh(ride)
     bg.add_task(manager.send_to_users, notify_ids, REFRESH)
     bg.add_task(manager.broadcast, REFRESH)
-    return _ride_to_out(ride)
+    return _ride_to_out(ride, db)
 
 
 @router.post("/{ride_id}/rate", response_model=RideOut)
@@ -309,7 +402,7 @@ def rate_ride(
     db.refresh(ride)
     if other_id:
         bg.add_task(manager.send_to_user, other_id, REFRESH)
-    return _ride_to_out(ride)
+    return _ride_to_out(ride, db)
 
 
 @router.get("/{ride_id}/receipt")
@@ -415,3 +508,109 @@ def get_driver_location(
     if not loc:
         return {"lat": None, "lng": None}
     return {"lat": loc.lat, "lng": loc.lng, "updated_at": loc.updated_at.isoformat()}
+
+
+# ---------------------------------------------------------------------------
+# In-ride messaging
+# ---------------------------------------------------------------------------
+
+class MessageCreate(BaseModel):
+    content: str
+    msg_type: str = "text"
+
+
+@router.post("/{ride_id}/messages")
+def send_message(
+    ride_id: int,
+    payload: MessageCreate,
+    bg: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ride = db.get(Ride, ride_id)
+    if ride is None:
+        raise HTTPException(status_code=404, detail="Ride not found")
+    if ride.status not in (RideStatus.accepted, RideStatus.in_progress):
+        raise HTTPException(status_code=400, detail="Chat only available for active rides")
+
+    # Only rider or accepted driver can send
+    accepted_driver = _accepted_driver_id(ride)
+    if user.id != ride.rider_id and user.id != accepted_driver:
+        raise HTTPException(status_code=403, detail="Not a participant in this ride")
+
+    msg = Message(
+        ride_id=ride_id,
+        sender_id=user.id,
+        content=payload.content,
+        msg_type=payload.msg_type,
+    )
+    db.add(msg)
+    db.commit()
+    db.refresh(msg)
+
+    # Notify the other party via WebSocket
+    recipient_id = ride.rider_id if user.id == accepted_driver else accepted_driver
+    if recipient_id:
+        bg.add_task(
+            manager.send_to_user,
+            recipient_id,
+            {
+                "type": "message",
+                "ride_id": ride_id,
+                "sender_id": user.id,
+                "sender_name": user.full_name,
+                "content": msg.content,
+                "msg_type": msg.msg_type,
+                "created_at": msg.created_at.isoformat(),
+            },
+        )
+
+    return {
+        "id": msg.id,
+        "ride_id": msg.ride_id,
+        "sender_id": msg.sender_id,
+        "sender_name": user.full_name,
+        "content": msg.content,
+        "msg_type": msg.msg_type,
+        "created_at": msg.created_at.isoformat(),
+    }
+
+
+@router.get("/{ride_id}/messages")
+def list_messages(
+    ride_id: int,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    ride = db.get(Ride, ride_id)
+    if ride is None:
+        raise HTTPException(status_code=404, detail="Ride not found")
+
+    accepted_driver = _accepted_driver_id(ride)
+    if user.id != ride.rider_id and user.id != accepted_driver:
+        raise HTTPException(status_code=403, detail="Not a participant in this ride")
+
+    msgs = (
+        db.query(Message)
+        .filter(Message.ride_id == ride_id)
+        .order_by(Message.created_at.asc())
+        .all()
+    )
+    # Get sender names
+    user_ids = {m.sender_id for m in msgs}
+    users = {u.id: u.full_name for u in db.query(User).filter(User.id.in_(user_ids)).all()}
+
+    return [
+        {
+            "id": m.id,
+            "ride_id": m.ride_id,
+            "sender_id": m.sender_id,
+            "sender_name": users.get(m.sender_id, "Unknown"),
+            "content": m.content,
+            "msg_type": m.msg_type,
+            "created_at": m.created_at.isoformat(),
+        }
+        for m in msgs
+    ]
+
+

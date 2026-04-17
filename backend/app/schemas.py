@@ -37,11 +37,27 @@ class UserOut(BaseModel):
     role: UserRole
     is_online: bool = False
     is_verified: bool = False
+    vehicle_type: str | None = None
     vehicle_model: str | None = None
     vehicle_color: str | None = None
     vehicle_plate: str | None = None
+    min_fare: float | None = None
+    rate_per_km: float | None = None
+    rate_per_min: float | None = None
     referral_code: str | None = None
     created_at: datetime
+
+
+class ProfileUpdate(BaseModel):
+    full_name: str | None = None
+    phone: str | None = None
+    vehicle_type: str | None = None
+    vehicle_model: str | None = None
+    vehicle_color: str | None = None
+    vehicle_plate: str | None = None
+    min_fare: float | None = None
+    rate_per_km: float | None = None
+    rate_per_min: float | None = None
 
 
 class DriverVerification(BaseModel):
@@ -92,6 +108,7 @@ class RideCreate(BaseModel):
     duration_min: float | None = None
     estimated_fare: float | None = None
     max_budget: float
+    ride_type: str = "car"
     notes: str = ""
 
 
@@ -101,6 +118,12 @@ class BidOut(BaseModel):
     ride_id: int
     driver_id: int
     driver_name: str | None = None
+    driver_phone: str | None = None
+    driver_vehicle_type: str | None = None
+    driver_vehicle_model: str | None = None
+    driver_vehicle_plate: str | None = None
+    driver_rating: float | None = None
+    driver_trip_count: int = 0
     amount: float
     eta_minutes: int
     message: str
@@ -123,6 +146,7 @@ class RideOut(BaseModel):
     duration_min: float | None = None
     estimated_fare: float | None = None
     max_budget: float
+    ride_type: str = "car"
     notes: str
     status: RideStatus
     accepted_bid_id: int | None

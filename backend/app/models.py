@@ -21,6 +21,13 @@ class RideStatus(str, PyEnum):
     cancelled = "cancelled"
 
 
+class VehicleType(str, PyEnum):
+    car = "car"
+    motorcycle = "motorcycle"
+    rickshaw = "rickshaw"
+    van = "van"
+
+
 class BidStatus(str, PyEnum):
     pending = "pending"
     accepted = "accepted"
@@ -43,6 +50,10 @@ class User(Base):
     vehicle_plate: Mapped[str | None] = mapped_column(String, nullable=True)
     vehicle_model: Mapped[str | None] = mapped_column(String, nullable=True)
     vehicle_color: Mapped[str | None] = mapped_column(String, nullable=True)
+    vehicle_type: Mapped[str | None] = mapped_column(String, nullable=True)
+    min_fare: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rate_per_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    rate_per_min: Mapped[float | None] = mapped_column(Float, nullable=True)
     referral_code: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
     referred_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
@@ -66,6 +77,7 @@ class Ride(Base):
     duration_min: Mapped[float | None] = mapped_column(Float, nullable=True)
     estimated_fare: Mapped[float | None] = mapped_column(Float, nullable=True)
     max_budget: Mapped[float] = mapped_column(Float, nullable=False)
+    ride_type: Mapped[str] = mapped_column(String, default="car")
     notes: Mapped[str] = mapped_column(String, default="")
     status: Mapped[RideStatus] = mapped_column(Enum(RideStatus), default=RideStatus.open)
     accepted_bid_id: Mapped[int | None] = mapped_column(ForeignKey("bids.id"), nullable=True)
@@ -124,6 +136,26 @@ class Dispute(Base):
     admin_response: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     resolved_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
+class Message(Base):
+    __tablename__ = "messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    ride_id: Mapped[int] = mapped_column(ForeignKey("rides.id"), nullable=False, index=True)
+    sender_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
+    content: Mapped[str] = mapped_column(String, nullable=False)
+    msg_type: Mapped[str] = mapped_column(String, default="text")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class HiddenRide(Base):
+    __tablename__ = "hidden_rides"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    driver_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    ride_id: Mapped[int] = mapped_column(ForeignKey("rides.id"), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
 class OTP(Base):
