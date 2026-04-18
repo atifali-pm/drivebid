@@ -1,6 +1,8 @@
 import { useEffect, useRef } from "react";
 
-const WS_BASE = "ws://drivebid.local:8050/ws";
+const WS_BASE =
+  (import.meta.env.VITE_WS_URL as string | undefined) ??
+  "ws://drivebid.local:8050/ws";
 const RECONNECT_BASE_MS = 1000;
 const RECONNECT_MAX_MS = 30000;
 const FALLBACK_POLL_MS = 30000;

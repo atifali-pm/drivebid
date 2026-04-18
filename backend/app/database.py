@@ -25,7 +25,12 @@ def ensure_schema() -> None:
 
     SQLAlchemy's create_all doesn't ALTER existing tables, so when we add
     nullable columns we patch them in here rather than dropping the DB.
+
+    Postgres production deploys use create_all on an empty schema and rely on
+    Alembic migrations afterwards — this helper is a SQLite-only shim.
     """
+    if not settings.database_url.startswith("sqlite"):
+        return
     expected_columns: dict[str, dict[str, str]] = {
         "rides": {
             "pickup_lat": "FLOAT",

@@ -18,13 +18,28 @@ init_firebase()
 
 app = FastAPI(title="DriveBid API", version="0.1.0")
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|drivebid\.local|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+)(:\d+)?",
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS: production uses an explicit allowlist from env var; dev uses permissive regex.
+#
+# In production set ALLOWED_ORIGINS="https://drivebid.vercel.app,https://drivebid.app"
+# (comma-separated). When set, it overrides the dev regex entirely.
+import os as _os  # local alias to avoid touching existing imports
+_prod_origins = _os.environ.get("ALLOWED_ORIGINS", "").strip()
+if _prod_origins:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[o.strip() for o in _prod_origins.split(",") if o.strip()],
+        allow_credentials=True,
+        allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+        allow_headers=["Authorization", "Content-Type", "Accept"],
+    )
+else:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origin_regex=r"https?://(localhost|127\.0\.0\.1|drivebid\.local|192\.168\.\d+\.\d+|10\.\d+\.\d+\.\d+|amusing-handcart-viewer\.ngrok-free\.dev)(:\d+)?",
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
 
 app.include_router(admin_router.router)
 app.include_router(auth_router.router)

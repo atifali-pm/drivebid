@@ -1,0 +1,75 @@
+name: Build Rider Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "EAS profile (preview or production)"
+        default: "preview"
+        type: choice
+        options: [preview, production]
+  push:
+    branches: [main]
+    paths:
+      - "mobile/rider/**"
+      - ".github/workflows/android-apk-rider.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      PROFILE: ${{ github.event.inputs.profile || 'preview' }}
+      EXPO_PUBLIC_API_URL: ${{ vars.EXPO_PUBLIC_API_URL }}
+      EXPO_PUBLIC_WS_URL: ${{ vars.EXPO_PUBLIC_WS_URL }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: android-actions/setup-android@v3
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Install deps
+        working-directory: mobile/rider
+        run: npm install --legacy-peer-deps
+
+      - uses: expo/expo-github-action@v8
+        with:
+          expo-version: latest
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Build APK
+        working-directory: mobile/rider
+        run: |
+          eas build --platform android --profile "$PROFILE" --local \
+            --non-interactive --output "../../drivebid-rider-${PROFILE}.apk"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: drivebid-rider-${{ env.PROFILE }}
+          path: drivebid-rider-*.apk
+
+      - name: Refresh `rider-android-latest` release
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: rider-android-latest
+          name: Rider Android (latest)
+          files: drivebid-rider-*.apk
+          body: |
+            Built from commit ${{ github.sha }} on `main`.
+          generate_release_notes: false
+          make_latest: "true"

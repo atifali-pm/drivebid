@@ -1,9 +1,22 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants from "expo-constants";
 
-// Change this to your machine's LAN IP when testing via Expo Go on a phone.
-// "localhost" only works on emulator. On a physical device, use your
-// computer's LAN IP, e.g. "http://192.168.1.42:8050"
-export const API_BASE = "https://amusing-handcart-viewer.ngrok-free.dev";
+function resolveApiUrl(): string {
+  const extra = (Constants.expoConfig?.extra ?? {}) as { apiUrl?: string };
+  if (extra.apiUrl && !extra.apiUrl.includes("localhost") && !extra.apiUrl.includes(".local")) {
+    return extra.apiUrl;
+  }
+  const hostUri = Constants.expoConfig?.hostUri ?? (Constants as any).expoGoConfig?.debuggerHost;
+  if (hostUri) {
+    const host = String(hostUri).split(":")[0];
+    if (host && host !== "localhost" && host !== "127.0.0.1") {
+      return `http://${host}:8050`;
+    }
+  }
+  return "https://amusing-handcart-viewer.ngrok-free.dev";
+}
+
+export const API_BASE = resolveApiUrl();
 
 export type UserRole = "rider" | "driver" | "admin";
 export type RideStatus =

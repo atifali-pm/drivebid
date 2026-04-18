@@ -1,0 +1,11 @@
+__pycache__
+*.pyc
+.venv
+venv
+env
+drivebid.db
+*.db
+firebase-service-account.json
+.env
+.env.*
+.pytest_cache

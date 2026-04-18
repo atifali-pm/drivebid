@@ -1,4 +1,6 @@
-const API_BASE = "http://drivebid.local:8050";
+const API_BASE =
+  (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
+  "http://drivebid.local:8050";
 
 export type UserRole = "rider" | "driver" | "admin";
 

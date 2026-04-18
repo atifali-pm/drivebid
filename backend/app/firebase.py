@@ -9,7 +9,9 @@ gracefully — the app still starts, but phone auth endpoints will return
 503 Service Unavailable.
 """
 
+import base64
 import os
+import tempfile
 from pathlib import Path
 
 import firebase_admin
@@ -17,10 +19,35 @@ from firebase_admin import auth as firebase_auth, credentials
 
 _initialized = False
 
-SERVICE_ACCOUNT_PATH = os.environ.get(
-    "FIREBASE_SERVICE_ACCOUNT_PATH",
-    str(Path(__file__).resolve().parent.parent / "firebase-service-account.json"),
-)
+
+def _resolve_service_account_path() -> str:
+    """Return the filesystem path to a Firebase service account JSON.
+
+    Production (Fly.io, GitHub Actions): expects FIREBASE_SERVICE_ACCOUNT_B64 —
+    a base64-encoded blob of the JSON file — which is decoded to a temp file
+    at startup.
+
+    Development: falls back to FIREBASE_SERVICE_ACCOUNT_PATH env var, or the
+    default `backend/firebase-service-account.json` on disk.
+    """
+    b64 = os.environ.get("FIREBASE_SERVICE_ACCOUNT_B64")
+    if b64:
+        try:
+            raw = base64.b64decode(b64).decode("utf-8")
+            with tempfile.NamedTemporaryFile(
+                mode="w", suffix=".json", delete=False
+            ) as f:
+                f.write(raw)
+                return f.name
+        except Exception as exc:  # pragma: no cover
+            print(f"[firebase] Failed to decode FIREBASE_SERVICE_ACCOUNT_B64: {exc}")
+    return os.environ.get(
+        "FIREBASE_SERVICE_ACCOUNT_PATH",
+        str(Path(__file__).resolve().parent.parent / "firebase-service-account.json"),
+    )
+
+
+SERVICE_ACCOUNT_PATH = _resolve_service_account_path()
 
 
 def init_firebase() -> bool:
