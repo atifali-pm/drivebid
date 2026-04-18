@@ -55,20 +55,42 @@ export default function PostRide() {
         setPickupLabel("My location");
         setMode("dropoff");
         mapRef.current?.center(here, 14);
+        reverseGeocode(here).then((label) => setPickupLabel(label));
       } catch {
         /* ignore */
       }
     })();
   }, []);
 
-  function onMapTap(coord: LatLng) {
+  async function reverseGeocode(coord: LatLng): Promise<string> {
+    try {
+      const res = await fetch(
+        `https://photon.komoot.io/reverse?lat=${coord.latitude}&lon=${coord.longitude}&lang=en`
+      );
+      if (!res.ok) return "Pinned location";
+      const data = await res.json();
+      const p = data?.features?.[0]?.properties;
+      if (!p) return "Pinned location";
+      const parts = [p.name, p.street, p.suburb || p.district || p.city]
+        .filter(Boolean);
+      return parts.join(", ") || "Pinned location";
+    } catch {
+      return "Pinned location";
+    }
+  }
+
+  async function onMapTap(coord: LatLng) {
     if (mode === "pickup") {
       setPickup(coord);
-      setPickupLabel((prev) => prev || "Pinned location");
+      setPickupLabel("Locating...");
       setMode("dropoff");
+      const label = await reverseGeocode(coord);
+      setPickupLabel(label);
     } else {
       setDropoff(coord);
-      setDropoffLabel((prev) => prev || "Pinned location");
+      setDropoffLabel("Locating...");
+      const label = await reverseGeocode(coord);
+      setDropoffLabel(label);
     }
   }
 

@@ -8,9 +8,12 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
+import { Audio } from "expo-av";
+import * as FileSystem from "expo-file-system";
 import { api, API_BASE, getToken, getStoredUser } from "../src/api";
 
 interface ChatMessage {
@@ -32,6 +35,9 @@ export default function Chat() {
   const [text, setText] = useState("");
   const [sending, setSending] = useState(false);
   const [myId, setMyId] = useState<number | null>(null);
+  const [recording, setRecording] = useState(false);
+  const recordingRef = useRef<Audio.Recording | null>(null);
+  const playingRef = useRef<Audio.Sound | null>(null);
   const flatRef = useRef<FlatList<ChatMessage> | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
 
@@ -120,6 +126,78 @@ export default function Chat() {
     }
   }
 
+  async function startRecording() {
+    try {
+      const perm = await Audio.requestPermissionsAsync();
+      if (!perm.granted) {
+        Alert.alert("Permission needed", "Grant microphone access to send voice messages.");
+        return;
+      }
+      await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+      const rec = new Audio.Recording();
+      await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+      await rec.startAsync();
+      recordingRef.current = rec;
+      setRecording(true);
+      Vibration.vibrate(40);
+    } catch (err) {
+      Alert.alert("Recording failed", err instanceof Error ? err.message : "");
+    }
+  }
+
+  async function stopAndSendRecording() {
+    const rec = recordingRef.current;
+    if (!rec) return;
+    setRecording(false);
+    Vibration.vibrate(30);
+    try {
+      await rec.stopAndUnloadAsync();
+      const uri = rec.getURI();
+      recordingRef.current = null;
+      if (!uri || !rideId) return;
+      const b64 = await FileSystem.readAsStringAsync(uri, { encoding: "base64" });
+      const dataUrl = `data:audio/m4a;base64,${b64}`;
+      setSending(true);
+      try {
+        await fetch(`${API_BASE}/rides/${rideId}/messages`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${await getToken()}`,
+          },
+          body: JSON.stringify({ content: dataUrl, msg_type: "voice" }),
+        });
+        loadMessages();
+      } finally {
+        setSending(false);
+      }
+    } catch (err) {
+      Alert.alert("Send failed", err instanceof Error ? err.message : "");
+    }
+  }
+
+  async function playVoice(content: string) {
+    try {
+      if (playingRef.current) {
+        await playingRef.current.unloadAsync();
+        playingRef.current = null;
+      }
+      const { sound } = await Audio.Sound.createAsync(
+        { uri: content },
+        { shouldPlay: true }
+      );
+      playingRef.current = sound;
+      sound.setOnPlaybackStatusUpdate(async (status) => {
+        if (status.isLoaded && status.didJustFinish) {
+          await sound.unloadAsync();
+          if (playingRef.current === sound) playingRef.current = null;
+        }
+      });
+    } catch {
+      Alert.alert("Playback failed", "Could not play voice message");
+    }
+  }
+
   function formatTime(iso: string) {
     try {
       const d = new Date(iso);
@@ -152,6 +230,7 @@ export default function Chat() {
         contentContainerStyle={styles.msgList}
         renderItem={({ item }) => {
           const isMe = item.sender_id === myId;
+          const isVoice = item.msg_type === "voice";
           return (
             <View
               style={[
@@ -162,9 +241,21 @@ export default function Chat() {
               {!isMe && (
                 <Text style={styles.senderName}>{item.sender_name}</Text>
               )}
-              <Text style={[styles.msgText, isMe && styles.msgTextMe]}>
-                {item.content}
-              </Text>
+              {isVoice ? (
+                <Pressable
+                  style={styles.voiceRow}
+                  onPress={() => playVoice(item.content)}
+                >
+                  <Text style={[styles.voicePlay, isMe && { color: "#fff" }]}>▶</Text>
+                  <Text style={[styles.voiceLabel, isMe && styles.msgTextMe]}>
+                    Voice message
+                  </Text>
+                </Pressable>
+              ) : (
+                <Text style={[styles.msgText, isMe && styles.msgTextMe]}>
+                  {item.content}
+                </Text>
+              )}
               <Text style={[styles.msgTime, isMe && styles.msgTimeMe]}>
                 {formatTime(item.created_at)}
               </Text>
@@ -186,17 +277,28 @@ export default function Chat() {
           style={styles.input}
           value={text}
           onChangeText={setText}
-          placeholder="Type a message..."
+          placeholder={recording ? "Recording... release to send" : "Type a message..."}
           multiline
           maxLength={500}
+          editable={!recording}
         />
-        <Pressable
-          style={[styles.sendBtn, (!text.trim() || sending) && { opacity: 0.4 }]}
-          onPress={send}
-          disabled={!text.trim() || sending}
-        >
-          <Text style={styles.sendTxt}>Send</Text>
-        </Pressable>
+        {text.trim() ? (
+          <Pressable
+            style={[styles.sendBtn, sending && { opacity: 0.4 }]}
+            onPress={send}
+            disabled={sending}
+          >
+            <Text style={styles.sendTxt}>Send</Text>
+          </Pressable>
+        ) : (
+          <Pressable
+            style={[styles.micBtn, recording && styles.micBtnRec]}
+            onPressIn={startRecording}
+            onPressOut={stopAndSendRecording}
+          >
+            <Text style={styles.micTxt}>{recording ? "●" : "🎤"}</Text>
+          </Pressable>
+        )}
       </View>
     </KeyboardAvoidingView>
   );
@@ -290,4 +392,17 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
   },
   sendTxt: { color: "#fff", fontWeight: "700", fontSize: 14 },
+  micBtn: {
+    backgroundColor: "#06b6d4",
+    borderRadius: 24,
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  micBtnRec: { backgroundColor: "#ef4444" },
+  micTxt: { fontSize: 20, color: "#fff" },
+  voiceRow: { flexDirection: "row", alignItems: "center", gap: 10, paddingVertical: 4 },
+  voicePlay: { fontSize: 22, color: "#0891b2" },
+  voiceLabel: { fontSize: 14, color: "#0f172a", fontWeight: "600" },
 });

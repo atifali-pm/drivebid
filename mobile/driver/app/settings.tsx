@@ -272,6 +272,20 @@ export default function DriverSettings() {
           {saving ? "Saving..." : "Save settings"}
         </Text>
       </Pressable>
+
+      <Pressable
+        style={styles.historyBtn}
+        onPress={() => router.push("/history")}
+      >
+        <Text style={styles.historyBtnText}>Ride history</Text>
+      </Pressable>
+
+      <Pressable
+        style={styles.historyBtn}
+        onPress={() => router.push("/earnings")}
+      >
+        <Text style={styles.historyBtnText}>Earnings</Text>
+      </Pressable>
     </ScrollView>
   );
 }
@@ -380,4 +394,10 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   saveBtnText: { color: "#fff", fontWeight: "700", fontSize: 16 },
+  historyBtn: {
+    marginHorizontal: 16, marginTop: 10, padding: 16,
+    alignItems: "center", borderWidth: 1, borderColor: "#d1fae5",
+    borderRadius: 12, backgroundColor: "#fff",
+  },
+  historyBtnText: { color: "#0f172a", fontWeight: "700", fontSize: 15 },
 });

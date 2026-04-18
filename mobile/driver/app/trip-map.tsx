@@ -14,6 +14,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { api, API_BASE, Ride, getToken } from "../src/api";
 import { formatMoney } from "../src/pricing";
 import { DisputeModal } from "../src/DisputeModal";
+import { startBackgroundLocation, stopBackgroundLocation } from "../src/backgroundLocation";
 import {
   LatLng,
   LeafletMap,
@@ -52,6 +53,15 @@ export default function DriverTripMap() {
     return () => {
       stop = true;
       clearInterval(t);
+    };
+  }, [rideId]);
+
+  // Start background location tracking when screen mounts (survives minimize)
+  useEffect(() => {
+    if (!rideId) return;
+    startBackgroundLocation(rideId).catch(() => { /* ignore — fg fallback */ });
+    return () => {
+      stopBackgroundLocation().catch(() => { /* ignore */ });
     };
   }, [rideId]);
 

@@ -149,6 +149,16 @@ class Message(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class PushToken(Base):
+    __tablename__ = "push_tokens"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False, index=True)
+    token: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+    platform: Mapped[str] = mapped_column(String, default="expo")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class HiddenRide(Base):
     __tablename__ = "hidden_rides"
 

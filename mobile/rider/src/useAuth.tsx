@@ -16,6 +16,7 @@ import {
   User,
   UserRole,
 } from "./api";
+import { registerForPushNotifications } from "./pushNotifications";
 
 interface AuthContextValue {
   user: User | null;
@@ -45,6 +46,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const handle = useCallback(async (res: TokenResponse) => {
     await persistAuth(res);
     setUser(res.user);
+    // Register for push notifications in the background (fire-and-forget)
+    registerForPushNotifications().catch(() => { /* ignore */ });
   }, []);
 
   const login = useCallback(

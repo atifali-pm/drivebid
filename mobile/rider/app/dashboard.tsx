@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Text,
   TextInput,
+  Vibration,
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -148,14 +149,23 @@ export default function Dashboard() {
             {user?.full_name ?? MOCK_USER_NAME} · Rider
           </Text>
         </View>
-        <Pressable onPress={handleLogout} style={styles.logoutBtn}>
-          <Text style={styles.logoutText}>Logout</Text>
-        </Pressable>
+        <View style={{ flexDirection: "row", gap: 8 }}>
+          <Pressable onPress={() => router.push("/settings")} style={styles.gearBtn}>
+            <Text style={styles.gearText}>⚙</Text>
+          </Pressable>
+          <Pressable onPress={handleLogout} style={styles.logoutBtn}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </Pressable>
+        </View>
       </View>
 
       <Pressable
-        style={styles.newRideBtn}
-        onPress={() => router.push("/post-ride")}
+        style={({ pressed }) => [
+          styles.newRideBtn,
+          pressed && { opacity: 0.8 },
+        ]}
+        android_ripple={{ color: "rgba(255,255,255,0.3)" }}
+        onPress={() => { Vibration.vibrate(35); router.push("/post-ride"); }}
       >
         <Text style={styles.newRideText}>+ Post New Ride</Text>
       </Pressable>
@@ -369,8 +379,12 @@ function RideCard({
                   </Text>
                 </View>
                 <Pressable
-                  style={styles.acceptBtn}
-                  onPress={() => acceptBid(bid.id)}
+                  style={({ pressed }) => [
+                    styles.acceptBtn,
+                    pressed && { opacity: 0.75 },
+                  ]}
+                  android_ripple={{ color: "rgba(255,255,255,0.3)" }}
+                  onPress={() => { Vibration.vibrate(40); acceptBid(bid.id); }}
                 >
                   <Text style={styles.acceptBtnText}>Accept</Text>
                 </Pressable>
@@ -441,6 +455,11 @@ const styles = StyleSheet.create({
   },
   brand: { fontSize: 18, fontWeight: "bold", color: "#1e293b" },
   subBrand: { fontSize: 12, color: "#64748b" },
+  gearBtn: {
+    borderWidth: 1, borderColor: "#cbd5e1",
+    borderRadius: 6, paddingHorizontal: 10, paddingVertical: 6,
+  },
+  gearText: { fontSize: 16 },
   logoutBtn: {
     borderWidth: 1,
     borderColor: "#cbd5e1",

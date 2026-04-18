@@ -10,6 +10,7 @@ from ..models import Bid, BidStatus, DriverLocation, HiddenRide, Message, Ride, 
 from ..schemas import BidCreate, BidOut, RatingCreate, RideCreate, RideOut
 from ..pricing import format_money
 from ..ws import manager
+from ..push import send_to_user as send_push
 
 REFRESH = {"type": "refresh"}
 
@@ -241,6 +242,12 @@ def place_bid(
     db.commit()
     db.refresh(bid)
     bg.add_task(manager.send_to_user, ride.rider_id, REFRESH)
+    bg.add_task(
+        send_push, db, ride.rider_id,
+        "New bid!",
+        f"{user.full_name} bid Rs {int(bid.amount)} · ETA {bid.eta_minutes} min",
+        {"type": "new_bid", "ride_id": ride.id},
+    )
     return BidOut(
         id=bid.id,
         ride_id=bid.ride_id,
@@ -286,6 +293,12 @@ def accept_bid(
     db.commit()
     db.refresh(ride)
     bg.add_task(manager.send_to_users, driver_ids, REFRESH)
+    bg.add_task(
+        send_push, db, bid.driver_id,
+        "Your bid was accepted!",
+        f"{ride.rider.full_name if ride.rider else 'Rider'} picked you — Rs {int(bid.amount)}",
+        {"type": "bid_accepted", "ride_id": ride.id},
+    )
     return _ride_to_out(ride, db)
 
 
@@ -563,6 +576,17 @@ def send_message(
                 "msg_type": msg.msg_type,
                 "created_at": msg.created_at.isoformat(),
             },
+        )
+        preview = (
+            "🎤 Voice message"
+            if msg.msg_type == "voice"
+            else (msg.content[:80] + "…" if len(msg.content) > 80 else msg.content)
+        )
+        bg.add_task(
+            send_push, db, recipient_id,
+            user.full_name,
+            preview,
+            {"type": "message", "ride_id": ride_id},
         )
 
     return {

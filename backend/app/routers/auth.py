@@ -166,6 +166,28 @@ def get_me(user: User = Depends(get_current_user)):
     return UserOut.model_validate(user)
 
 
+class PushTokenCreate(BaseModel):
+    token: str
+    platform: str = "expo"
+
+
+@router.post("/push-token")
+def register_push_token(
+    payload: PushTokenCreate,
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    from ..models import PushToken
+    existing = db.query(PushToken).filter(PushToken.token == payload.token).first()
+    if existing:
+        existing.user_id = user.id
+        existing.platform = payload.platform
+    else:
+        db.add(PushToken(user_id=user.id, token=payload.token, platform=payload.platform))
+    db.commit()
+    return {"status": "registered"}
+
+
 @router.patch("/profile", response_model=UserOut)
 def update_profile(
     payload: ProfileUpdate,
