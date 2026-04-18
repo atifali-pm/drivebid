@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: drivebid-api
+    runtime: docker
+    region: frankfurt
+    plan: free
+    rootDir: backend
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: FIREBASE_SERVICE_ACCOUNT_B64
+        sync: false
+      - key: ALLOWED_ORIGINS
+        sync: false
