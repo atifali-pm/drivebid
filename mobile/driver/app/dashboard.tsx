@@ -373,8 +373,8 @@ function ArchivedRideCard({
   );
 }
 
-// Bid amount values: Rs 100 up to Rs 5000 in Rs 50 steps (99 items)
-const BID_AMOUNT_VALUES = Array.from({ length: 99 }, (_, i) => 100 + i * 50);
+// Bid amount values: Rs 100 up to Rs 5000 in Rs 10 steps (491 items)
+const BID_AMOUNT_VALUES = Array.from({ length: 491 }, (_, i) => 100 + i * 10);
 // ETA values: 1..30 min
 const BID_ETA_VALUES = Array.from({ length: 30 }, (_, i) => i + 1);
 
@@ -391,11 +391,11 @@ function OpenRideCard({
 }) {
   const effectiveUserId = SCREENSHOT_MODE ? MOCK_DRIVER_ID : userId;
   const myBid = ride.bids.find((b) => b.driver_id === effectiveUserId);
-  // Default the amount to the estimated fare (rounded to nearest 50), clamped
+  // Default the amount to the estimated fare (rounded to nearest 10), clamped
   // into our picker range.
   const suggested =
     ride.estimated_fare != null
-      ? Math.round(ride.estimated_fare / 50) * 50
+      ? Math.round(ride.estimated_fare / 10) * 10
       : 500;
   const clampedSuggested = Math.max(
     BID_AMOUNT_VALUES[0],
