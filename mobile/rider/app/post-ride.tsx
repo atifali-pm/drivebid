@@ -23,8 +23,8 @@ const RIDE_TYPES = [
   { key: "van", label: "Van", icon: "🚐" },
 ];
 
-// Build a list of budget values from Rs 200 to Rs 5000 in Rs 50 steps
-const BUDGET_VALUES = Array.from({ length: 97 }, (_, i) => 200 + i * 50);
+// Build a list of budget values from Rs 200 to Rs 5000 in Rs 10 steps
+const BUDGET_VALUES = Array.from({ length: 481 }, (_, i) => 200 + i * 10);
 
 export default function PostRide() {
   const router = useRouter();
@@ -39,7 +39,6 @@ export default function PostRide() {
   const [rideType, setRideType] = useState("car");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
-  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -134,7 +133,7 @@ export default function PostRide() {
   // they can then nudge up or down.
   useEffect(() => {
     if (estFare == null) return;
-    const target = Math.round((estFare * 1.15) / 50) * 50;
+    const target = Math.round((estFare * 1.15) / 10) * 10;
     const clamped = Math.max(
       BUDGET_VALUES[0],
       Math.min(BUDGET_VALUES[BUDGET_VALUES.length - 1], target)
@@ -199,17 +198,8 @@ export default function PostRide() {
   const polyline = pickup && dropoff ? [pickup, dropoff] : undefined;
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 120 }}
-      scrollEnabled={scrollEnabled}
-    >
-      <View
-        style={styles.mapWrap}
-        onTouchStart={() => setScrollEnabled(false)}
-        onTouchEnd={() => setScrollEnabled(true)}
-        onTouchCancel={() => setScrollEnabled(true)}
-      >
+    <View style={styles.container}>
+      <View style={styles.mapWrap}>
         <LeafletMap
           ref={mapRef}
           initialCenter={initialCenter}
@@ -254,7 +244,12 @@ export default function PostRide() {
         </View>
       </View>
 
-      <View style={styles.sheet}>
+      <ScrollView
+        style={styles.sheetScroll}
+        contentContainerStyle={{ paddingBottom: 120 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        <View style={styles.sheet}>
         <View style={styles.grab} />
         <Text style={styles.sheetTitle}>Post new ride</Text>
         <Text style={styles.sheetSub}>
@@ -354,11 +349,13 @@ export default function PostRide() {
         </Pressable>
       </View>
     </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#f8fafc" },
+  sheetScroll: { flex: 1, marginTop: -20 },
   mapWrap: { height: 420, backgroundColor: "#e2e8f0" },
   backBtn: {
     position: "absolute",
@@ -407,7 +404,6 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     padding: 20,
-    marginTop: -20,
   },
   grab: {
     width: 40,
