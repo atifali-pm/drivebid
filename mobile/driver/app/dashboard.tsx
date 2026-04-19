@@ -359,21 +359,7 @@ function OpenRideCard({
   }
 
   function handleHide() {
-    Alert.alert(
-      "Archive this ride?",
-      `${ride.pickup} → ${ride.dropoff}\n\nYou can restore it later from the Archived section.`,
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Archive",
-          style: "destructive",
-          onPress: () => {
-            if (onDismiss) onDismiss(ride);
-          },
-        },
-      ],
-      { cancelable: true }
-    );
+    if (onDismiss) onDismiss(ride);
   }
 
   return (
@@ -389,13 +375,13 @@ function OpenRideCard({
           <Text style={styles.expandChevron}>{expanded ? "▲" : "▼"}</Text>
           <Pressable
             onPress={handleHide}
-            android_ripple={{ color: "rgba(239,68,68,0.3)", borderless: true, radius: 18 }}
+            android_ripple={{ color: "rgba(239,68,68,0.2)" }}
             style={({ pressed }) => [
-              styles.dismissBtn,
-              pressed && styles.dismissBtnPressed,
+              styles.archiveBtn,
+              pressed && styles.archiveBtnPressed,
             ]}
           >
-            <Text style={styles.dismissText}>✕</Text>
+            <Text style={styles.archiveBtnText}>📦 Archive</Text>
           </Pressable>
         </View>
         <View style={styles.budgetBanner}>
@@ -627,16 +613,19 @@ const styles = StyleSheet.create({
   rideTypeIcon: { fontSize: 24, marginRight: 4 },
   cardHeaderRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   cardRoute: { fontSize: 14, fontWeight: "600", color: "#1e293b", marginBottom: 2 },
-  dismissBtn: {
-    width: 32, height: 32, borderRadius: 16,
-    backgroundColor: "#f1f5f9", borderWidth: 1, borderColor: "#e2e8f0",
-    alignItems: "center", justifyContent: "center",
+  archiveBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 14,
+    backgroundColor: "#fef3c7",
+    borderWidth: 1,
+    borderColor: "#fcd34d",
   },
-  dismissBtnPressed: {
-    backgroundColor: "#fee2e2",
-    borderColor: "#fca5a5",
+  archiveBtnPressed: {
+    backgroundColor: "#fde68a",
+    borderColor: "#f59e0b",
   },
-  dismissText: { fontSize: 16, color: "#94a3b8", fontWeight: "700" },
+  archiveBtnText: { fontSize: 11, color: "#92400e", fontWeight: "700" },
   expandChevron: { fontSize: 12, color: "#94a3b8", marginRight: 8 },
   cardMeta: { fontSize: 12, color: "#64748b", marginBottom: 2 },
   budgetBanner: {
