@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -12,7 +12,6 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
-import Swipeable from "react-native-gesture-handler/Swipeable";
 import { api, Ride } from "../src/api";
 import { useAuth } from "../src/useAuth";
 import { formatDistance, formatDuration, formatMoney } from "../src/pricing";
@@ -223,9 +222,7 @@ export default function Dashboard() {
         )}
         renderItem={({ item, section }) =>
           section.type === "open" ? (
-            <SwipeableRideCard ride={item} onDismiss={dismissRide}>
-              <OpenRideCard ride={item} userId={user?.id ?? 0} onAction={refresh} onDismiss={dismissRide} />
-            </SwipeableRideCard>
+            <OpenRideCard ride={item} userId={user?.id ?? 0} onAction={refresh} onDismiss={dismissRide} />
           ) : (
             <MyTripCard ride={item} userId={user?.id ?? 0} onAction={refresh} />
           )
@@ -235,7 +232,7 @@ export default function Dashboard() {
         }
         contentContainerStyle={{ paddingBottom: 20 }}
         stickySectionHeadersEnabled={false}
-        ListFooterComponent={
+        ListHeaderComponent={
           archivedRides.length > 0 ? (
             <View style={styles.archiveSection}>
               <Pressable
@@ -267,69 +264,6 @@ export default function Dashboard() {
         </View>
       )}
     </View>
-  );
-}
-
-function SwipeableRideCard({
-  ride,
-  onDismiss,
-  children,
-}: {
-  ride: Ride;
-  onDismiss: (ride: Ride) => void;
-  children: React.ReactNode;
-}) {
-  const swipeRef = useRef<Swipeable | null>(null);
-
-  function renderRightActions() {
-    return (
-      <View style={styles.swipeAction}>
-        <Text style={styles.swipeActionText}>Archive</Text>
-      </View>
-    );
-  }
-
-  function renderLeftActions() {
-    return (
-      <View style={[styles.swipeAction, { backgroundColor: "#dc2626" }]}>
-        <Text style={styles.swipeActionText}>Archive</Text>
-      </View>
-    );
-  }
-
-  return (
-    <Swipeable
-      ref={swipeRef}
-      renderRightActions={renderRightActions}
-      renderLeftActions={renderLeftActions}
-      onSwipeableOpen={() => {
-        Alert.alert(
-          "Archive this ride?",
-          `${ride.pickup} → ${ride.dropoff}\n\nYou can restore it later from the Archived section.`,
-          [
-            {
-              text: "Cancel",
-              style: "cancel",
-              onPress: () => swipeRef.current?.close(),
-            },
-            {
-              text: "Archive",
-              style: "destructive",
-              onPress: () => {
-                swipeRef.current?.close();
-                onDismiss(ride);
-              },
-            },
-          ],
-          { cancelable: true, onDismiss: () => swipeRef.current?.close() }
-        );
-      }}
-      overshootLeft={false}
-      overshootRight={false}
-      friction={2}
-    >
-      {children}
-    </Swipeable>
   );
 }
 
@@ -405,6 +339,7 @@ function OpenRideCard({
   const [eta, setEta] = useState<number>(5);
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   async function handleBid() {
     setLoading(true);
@@ -424,44 +359,59 @@ function OpenRideCard({
   }
 
   function handleHide() {
-    if (onDismiss) {
-      onDismiss(ride);
-    }
+    Alert.alert(
+      "Archive this ride?",
+      `${ride.pickup} → ${ride.dropoff}\n\nYou can restore it later from the Archived section.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Archive",
+          style: "destructive",
+          onPress: () => {
+            if (onDismiss) onDismiss(ride);
+          },
+        },
+      ],
+      { cancelable: true }
+    );
   }
 
   return (
     <View style={styles.card}>
-      <View style={styles.cardHeaderRow}>
-        <Text style={styles.rideTypeIcon}>
-          {ride.ride_type === "motorcycle" ? "🏍️" : ride.ride_type === "rickshaw" ? "🛺" : ride.ride_type === "van" ? "🚐" : "🚗"}
-        </Text>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.cardRoute}>{ride.pickup} → {ride.dropoff}</Text>
+      <Pressable onPress={() => setExpanded((e) => !e)}>
+        <View style={styles.cardHeaderRow}>
+          <Text style={styles.rideTypeIcon}>
+            {ride.ride_type === "motorcycle" ? "🏍️" : ride.ride_type === "rickshaw" ? "🛺" : ride.ride_type === "van" ? "🚐" : "🚗"}
+          </Text>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.cardRoute}>{ride.pickup} → {ride.dropoff}</Text>
+          </View>
+          <Text style={styles.expandChevron}>{expanded ? "▲" : "▼"}</Text>
+          <Pressable
+            onPress={handleHide}
+            android_ripple={{ color: "rgba(239,68,68,0.3)", borderless: true, radius: 18 }}
+            style={({ pressed }) => [
+              styles.dismissBtn,
+              pressed && styles.dismissBtnPressed,
+            ]}
+          >
+            <Text style={styles.dismissText}>✕</Text>
+          </Pressable>
         </View>
-        <Pressable
-          onPress={handleHide}
-          android_ripple={{ color: "rgba(239,68,68,0.3)", borderless: true, radius: 18 }}
-          style={({ pressed }) => [
-            styles.dismissBtn,
-            pressed && styles.dismissBtnPressed,
-          ]}
-        >
-          <Text style={styles.dismissText}>✕</Text>
-        </Pressable>
-      </View>
-      <View style={styles.budgetBanner}>
-        <Text style={styles.budgetBannerLabel}>MAX BUDGET</Text>
-        <Text style={styles.budgetBannerAmount}>{formatMoney(ride.max_budget)}</Text>
-      </View>
-      <Text style={styles.cardMeta}>
-        {ride.rider_name}
-        {ride.estimated_fare != null && ` · Est. ${formatMoney(ride.estimated_fare)}`}
-      </Text>
-      <Text style={styles.cardMeta}>
-        {ride.distance_km != null ? formatDistance(ride.distance_km) : ""}
-        {ride.duration_min != null ? ` · ${formatDuration(ride.duration_min)}` : ""}
-        {` · ${ride.bids.length} bid${ride.bids.length === 1 ? "" : "s"}`}
-      </Text>
+        <View style={styles.budgetBanner}>
+          <Text style={styles.budgetBannerLabel}>MAX BUDGET</Text>
+          <Text style={styles.budgetBannerAmount}>{formatMoney(ride.max_budget)}</Text>
+        </View>
+        <Text style={styles.cardMeta}>
+          {ride.rider_name}
+          {ride.estimated_fare != null && ` · Est. ${formatMoney(ride.estimated_fare)}`}
+        </Text>
+        <Text style={styles.cardMeta}>
+          {ride.distance_km != null ? formatDistance(ride.distance_km) : ""}
+          {ride.duration_min != null ? ` · ${formatDuration(ride.duration_min)}` : ""}
+          {` · ${ride.bids.length} bid${ride.bids.length === 1 ? "" : "s"}`}
+        </Text>
+      </Pressable>
 
       {myBid ? (
         <View style={styles.myBidBox}>
@@ -469,7 +419,7 @@ function OpenRideCard({
             You bid {formatMoney(myBid.amount)}
           </Text>
         </View>
-      ) : (
+      ) : expanded ? (
         <View style={styles.bidForm}>
           {ride.estimated_fare != null && (
             <Text style={styles.suggest}>
@@ -517,7 +467,7 @@ function OpenRideCard({
             </Text>
           </Pressable>
         </View>
-      )}
+      ) : null}
     </View>
   );
 }
@@ -687,6 +637,7 @@ const styles = StyleSheet.create({
     borderColor: "#fca5a5",
   },
   dismissText: { fontSize: 16, color: "#94a3b8", fontWeight: "700" },
+  expandChevron: { fontSize: 12, color: "#94a3b8", marginRight: 8 },
   cardMeta: { fontSize: 12, color: "#64748b", marginBottom: 2 },
   budgetBanner: {
     flexDirection: "row",
@@ -846,16 +797,6 @@ const styles = StyleSheet.create({
     elevation: 8,
   },
   toastText: { color: "#fff", fontWeight: "600", fontSize: 14 },
-  swipeAction: {
-    backgroundColor: "#f59e0b",
-    justifyContent: "center",
-    alignItems: "center",
-    width: 100,
-    borderRadius: 12,
-    marginBottom: 10,
-    marginHorizontal: 4,
-  },
-  swipeActionText: { color: "#fff", fontWeight: "800", fontSize: 13 },
   quickRow: {
     flexDirection: "row",
     gap: 8,
