@@ -303,8 +303,26 @@ function SwipeableRideCard({
       renderRightActions={renderRightActions}
       renderLeftActions={renderLeftActions}
       onSwipeableOpen={() => {
-        swipeRef.current?.close();
-        onDismiss(ride);
+        Alert.alert(
+          "Archive this ride?",
+          `${ride.pickup} → ${ride.dropoff}\n\nYou can restore it later from the Archived section.`,
+          [
+            {
+              text: "Cancel",
+              style: "cancel",
+              onPress: () => swipeRef.current?.close(),
+            },
+            {
+              text: "Archive",
+              style: "destructive",
+              onPress: () => {
+                swipeRef.current?.close();
+                onDismiss(ride);
+              },
+            },
+          ],
+          { cancelable: true, onDismiss: () => swipeRef.current?.close() }
+        );
       }}
       overshootLeft={false}
       overshootRight={false}
