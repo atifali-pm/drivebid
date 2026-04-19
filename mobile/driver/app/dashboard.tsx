@@ -449,8 +449,12 @@ function OpenRideCard({
           <Text style={styles.dismissText}>✕</Text>
         </Pressable>
       </View>
+      <View style={styles.budgetBanner}>
+        <Text style={styles.budgetBannerLabel}>MAX BUDGET</Text>
+        <Text style={styles.budgetBannerAmount}>{formatMoney(ride.max_budget)}</Text>
+      </View>
       <Text style={styles.cardMeta}>
-        {ride.rider_name} · Budget {formatMoney(ride.max_budget)}
+        {ride.rider_name}
         {ride.estimated_fare != null && ` · Est. ${formatMoney(ride.estimated_fare)}`}
       </Text>
       <Text style={styles.cardMeta}>
@@ -684,6 +688,30 @@ const styles = StyleSheet.create({
   },
   dismissText: { fontSize: 16, color: "#94a3b8", fontWeight: "700" },
   cardMeta: { fontSize: 12, color: "#64748b", marginBottom: 2 },
+  budgetBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: "#ecfdf5",
+    borderWidth: 1.5,
+    borderColor: "#10b981",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    marginTop: 8,
+    marginBottom: 8,
+  },
+  budgetBannerLabel: {
+    fontSize: 11,
+    fontWeight: "800",
+    color: "#065f46",
+    letterSpacing: 0.5,
+  },
+  budgetBannerAmount: {
+    fontSize: 20,
+    fontWeight: "800",
+    color: "#059669",
+  },
   badge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { color: "#fff", fontSize: 10, fontWeight: "700", textTransform: "uppercase" },
   myBidBox: {
