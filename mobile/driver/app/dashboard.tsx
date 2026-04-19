@@ -115,7 +115,6 @@ export default function Dashboard() {
   const [openRides, setOpenRides] = useState<Ride[]>(initialOpen);
   const [myRides, setMyRides] = useState<Ride[]>(initialMine);
   const [archivedRides, setArchivedRides] = useState<Ride[]>([]);
-  const [showArchive, setShowArchive] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -234,27 +233,23 @@ export default function Dashboard() {
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
           archivedRides.length > 0 ? (
-            <View style={styles.archiveSection}>
-              <Pressable
-                style={styles.archiveToggle}
-                onPress={() => setShowArchive(!showArchive)}
-              >
-                <Text style={styles.archiveToggleText}>
-                  Archived ({archivedRides.length})
+            <Pressable
+              style={styles.archiveRow}
+              android_ripple={{ color: "rgba(148,163,184,0.2)" }}
+              onPress={() => router.push("/archived")}
+            >
+              <View style={styles.archiveIconWrap}>
+                <Text style={styles.archiveIcon}>📦</Text>
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.archiveRowTitle}>Archived</Text>
+                <Text style={styles.archiveRowSub}>
+                  {archivedRides.length} ride
+                  {archivedRides.length === 1 ? "" : "s"}
                 </Text>
-                <Text style={styles.archiveArrow}>
-                  {showArchive ? "▲" : "▼"}
-                </Text>
-              </Pressable>
-              {showArchive &&
-                archivedRides.map((ride) => (
-                  <ArchivedRideCard
-                    key={ride.id}
-                    ride={ride}
-                    onRestore={refresh}
-                  />
-                ))}
-            </View>
+              </View>
+              <Text style={styles.archiveChevron}>›</Text>
+            </Pressable>
           ) : null
         }
       />
@@ -263,46 +258,6 @@ export default function Dashboard() {
           <Text style={styles.toastText}>{toast}</Text>
         </View>
       )}
-    </View>
-  );
-}
-
-function ArchivedRideCard({
-  ride,
-  onRestore,
-}: {
-  ride: Ride;
-  onRestore: () => void;
-}) {
-  async function handleRestore() {
-    try {
-      await api.unhideRide(ride.id);
-      onRestore();
-    } catch {
-      /* ignore */
-    }
-  }
-
-  return (
-    <View style={styles.archivedCard}>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.archivedRoute}>
-          {ride.pickup} → {ride.dropoff}
-        </Text>
-        <Text style={styles.archivedMeta}>
-          {ride.rider_name} · {formatMoney(ride.max_budget)}
-        </Text>
-      </View>
-      <Pressable
-        onPress={() => { Vibration.vibrate(35); handleRestore(); }}
-        android_ripple={{ color: "rgba(16,185,129,0.2)" }}
-        style={({ pressed }) => [
-          styles.restoreBtn,
-          pressed && styles.btnPressed,
-        ]}
-      >
-        <Text style={styles.restoreText}>Restore</Text>
-      </Pressable>
     </View>
   );
 }
@@ -731,45 +686,32 @@ const styles = StyleSheet.create({
   },
   paidText: { color: "#047857", fontSize: 12, fontWeight: "700" },
   reportLink: { color: "#dc2626", fontSize: 11, fontWeight: "600" },
-  archiveSection: {
+  archiveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#fff",
     marginHorizontal: 16,
     marginTop: 8,
-    marginBottom: 20,
-  },
-  archiveToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
+    marginBottom: 4,
     paddingVertical: 12,
     paddingHorizontal: 14,
-    backgroundColor: "#f1f5f9",
-    borderRadius: 10,
+    borderRadius: 12,
     borderWidth: 1,
     borderColor: "#e2e8f0",
   },
-  archiveToggleText: { fontSize: 13, fontWeight: "700", color: "#64748b" },
-  archiveArrow: { fontSize: 12, color: "#94a3b8" },
-  archivedCard: {
-    flexDirection: "row",
+  archiveIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#fef3c7",
     alignItems: "center",
-    padding: 12,
-    marginTop: 8,
-    backgroundColor: "#f8fafc",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
+    justifyContent: "center",
+    marginRight: 12,
   },
-  archivedRoute: { fontSize: 13, fontWeight: "600", color: "#64748b" },
-  archivedMeta: { fontSize: 11, color: "#94a3b8", marginTop: 2 },
-  restoreBtn: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-    backgroundColor: "#ecfdf5",
-    borderWidth: 1,
-    borderColor: "#6ee7b7",
-  },
-  restoreText: { fontSize: 12, fontWeight: "700", color: "#047857" },
+  archiveIcon: { fontSize: 18 },
+  archiveRowTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  archiveRowSub: { fontSize: 12, color: "#64748b", marginTop: 2 },
+  archiveChevron: { fontSize: 24, color: "#cbd5e1", fontWeight: "300" },
   toast: {
     position: "absolute",
     bottom: 80,
