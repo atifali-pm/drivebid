@@ -15,6 +15,11 @@ import { api, Ride } from "../src/api";
 import { useAuth } from "../src/useAuth";
 import { formatDistance, formatDuration, formatMoney } from "../src/pricing";
 import { DisputeModal } from "../src/DisputeModal";
+import { LeafletMap } from "../src/LeafletMap";
+
+function vehicleEmoji(t: string | null | undefined): string {
+  return t === "motorcycle" ? "🏍️" : t === "rickshaw" ? "🛺" : t === "van" ? "🚐" : "🚗";
+}
 
 // Flip to true to render hardcoded data for portfolio screenshots. Leave false for normal use.
 const SCREENSHOT_MODE = false;
@@ -365,6 +370,43 @@ function RideCard({
           <Text style={styles.bidsLabel}>
             Bids ({ride.bids.length})
           </Text>
+
+          {ride.pickup_lat != null && ride.pickup_lng != null && (
+            (() => {
+              const bidsWithLoc = ride.bids.filter(
+                (b) => b.driver_lat != null && b.driver_lng != null
+              );
+              if (bidsWithLoc.length === 0) return null;
+              return (
+                <View style={styles.previewMap}>
+                  <LeafletMap
+                    initialCenter={{
+                      latitude: ride.pickup_lat,
+                      longitude: ride.pickup_lng,
+                    }}
+                    initialZoom={13}
+                    markers={[
+                      {
+                        id: "pickup",
+                        latitude: ride.pickup_lat,
+                        longitude: ride.pickup_lng,
+                        color: "green",
+                        label: "Pickup",
+                      },
+                      ...bidsWithLoc.map((b) => ({
+                        id: `driver-${b.id}`,
+                        latitude: b.driver_lat as number,
+                        longitude: b.driver_lng as number,
+                        icon: vehicleEmoji(b.driver_vehicle_type),
+                        label: b.driver_name ?? "Driver",
+                      })),
+                    ]}
+                  />
+                </View>
+              );
+            })()
+          )}
+
           {ride.bids
             .sort((a, b) => a.amount - b.amount)
             .map((bid) => (
@@ -526,6 +568,14 @@ const styles = StyleSheet.create({
   acceptedText: { fontSize: 13, color: "#1e3a5f" },
   plateText: { fontSize: 11, color: "#3b82f6", fontWeight: "700", marginTop: 4 },
   bids: { marginTop: 10 },
+  previewMap: {
+    height: 180,
+    borderRadius: 10,
+    overflow: "hidden",
+    marginTop: 8,
+    marginBottom: 8,
+    backgroundColor: "#e2e8f0",
+  },
   bidsLabel: {
     fontSize: 11,
     fontWeight: "600",

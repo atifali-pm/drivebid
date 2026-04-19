@@ -49,6 +49,8 @@ export interface Bid {
   driver_vehicle_plate: string | null;
   driver_rating: number | null;
   driver_trip_count: number;
+  driver_lat: number | null;
+  driver_lng: number | null;
   amount: number;
   eta_minutes: number;
   message: string;

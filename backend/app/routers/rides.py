@@ -48,8 +48,14 @@ def _ride_to_out(ride: Ride, db=None) -> RideOut:
     data.bids = []
     for b in ride.bids:
         rating, trips = (None, 0)
+        driver_lat: float | None = None
+        driver_lng: float | None = None
         if db and b.driver:
             rating, trips = _driver_stats(b.driver_id, db)
+            loc = db.get(DriverLocation, b.driver_id)
+            if loc is not None:
+                driver_lat = loc.lat
+                driver_lng = loc.lng
         data.bids.append(BidOut(
             id=b.id,
             ride_id=b.ride_id,
@@ -61,6 +67,8 @@ def _ride_to_out(ride: Ride, db=None) -> RideOut:
             driver_vehicle_plate=b.driver.vehicle_plate if b.driver else None,
             driver_rating=rating,
             driver_trip_count=trips,
+            driver_lat=driver_lat,
+            driver_lng=driver_lng,
             amount=b.amount,
             eta_minutes=b.eta_minutes,
             message=b.message,

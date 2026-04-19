@@ -124,6 +124,8 @@ class BidOut(BaseModel):
     driver_vehicle_plate: str | None = None
     driver_rating: float | None = None
     driver_trip_count: int = 0
+    driver_lat: float | None = None
+    driver_lng: float | None = None
     amount: float
     eta_minutes: int
     message: str
