@@ -61,7 +61,7 @@ export default ({ config }: ConfigContext): ExpoConfig => ({
     apiUrl: process.env.EXPO_PUBLIC_API_URL ?? "https://amusing-handcart-viewer.ngrok-free.dev",
     wsUrl: process.env.EXPO_PUBLIC_WS_URL ?? "wss://amusing-handcart-viewer.ngrok-free.dev/ws",
     eas: {
-      // filled by `eas init`
+      projectId: "300fab10-a384-4f70-aece-03829fa3c19c",
     },
   },
 });
