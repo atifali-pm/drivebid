@@ -133,7 +133,7 @@ export default function PostRide() {
   // they can then nudge up or down.
   useEffect(() => {
     if (estFare == null) return;
-    const target = Math.round((estFare * 1.15) / 10) * 10;
+    const target = Math.round((estFare * 1.05) / 10) * 10;
     const clamped = Math.max(
       BUDGET_VALUES[0],
       Math.min(BUDGET_VALUES[BUDGET_VALUES.length - 1], target)
