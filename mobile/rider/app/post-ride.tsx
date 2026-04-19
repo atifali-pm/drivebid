@@ -39,6 +39,7 @@ export default function PostRide() {
   const [rideType, setRideType] = useState("car");
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
+  const [scrollEnabled, setScrollEnabled] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -201,8 +202,14 @@ export default function PostRide() {
     <ScrollView
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 120 }}
+      scrollEnabled={scrollEnabled}
     >
-      <View style={styles.mapWrap}>
+      <View
+        style={styles.mapWrap}
+        onTouchStart={() => setScrollEnabled(false)}
+        onTouchEnd={() => setScrollEnabled(true)}
+        onTouchCancel={() => setScrollEnabled(true)}
+      >
         <LeafletMap
           ref={mapRef}
           initialCenter={initialCenter}
