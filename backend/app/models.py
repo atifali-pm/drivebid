@@ -1,7 +1,7 @@
 from datetime import datetime
 from enum import Enum as PyEnum
 
-from sqlalchemy import DateTime, Enum, Float, ForeignKey, Integer, String
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from .database import Base
@@ -43,8 +43,8 @@ class User(Base):
     full_name: Mapped[str] = mapped_column(String, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String, nullable=False)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), nullable=False)
-    is_online: Mapped[bool] = mapped_column(Integer, default=False, server_default="0")
-    is_verified: Mapped[bool] = mapped_column(Integer, default=False, server_default="0")
+    is_online: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
+    is_verified: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     cnic_number: Mapped[str | None] = mapped_column(String, nullable=True)
     license_number: Mapped[str | None] = mapped_column(String, nullable=True)
     vehicle_plate: Mapped[str | None] = mapped_column(String, nullable=True)
@@ -175,4 +175,4 @@ class OTP(Base):
     phone: Mapped[str] = mapped_column(String, nullable=False, index=True)
     code: Mapped[str] = mapped_column(String, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    used: Mapped[bool] = mapped_column(Integer, default=False)
+    used: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
