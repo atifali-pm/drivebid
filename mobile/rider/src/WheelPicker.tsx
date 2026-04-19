@@ -3,6 +3,7 @@ import {
   FlatList,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Pressable,
   StyleSheet,
   Text,
   View,
@@ -84,7 +85,16 @@ export function WheelPicker({
         renderItem={({ item, index }) => {
           const active = index === selectedIndex;
           return (
-            <View style={[styles.item, { width: itemWidth }]}>
+            <Pressable
+              style={[styles.item, { width: itemWidth }]}
+              onPress={() => {
+                if (item !== value) onChange(item);
+                listRef.current?.scrollToOffset({
+                  offset: index * itemWidth,
+                  animated: true,
+                });
+              }}
+            >
               <Text
                 style={[
                   styles.itemText,
@@ -97,7 +107,7 @@ export function WheelPicker({
               >
                 {fmt(item)}
               </Text>
-            </View>
+            </Pressable>
           );
         }}
       />
