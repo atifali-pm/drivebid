@@ -1,4 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+
+AUCTION_WINDOW_SECONDS = 60
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -99,6 +101,7 @@ def create_ride(
         max_budget=payload.max_budget,
         ride_type=payload.ride_type,
         notes=payload.notes,
+        auction_ends_at=datetime.utcnow() + timedelta(seconds=AUCTION_WINDOW_SECONDS),
     )
     db.add(ride)
     db.commit()
@@ -239,6 +242,25 @@ def place_bid(
             status_code=400,
             detail=f"Bid exceeds rider's max budget of {ride.max_budget}",
         )
+    now = datetime.utcnow()
+    if ride.auction_ends_at is not None and now > ride.auction_ends_at:
+        raise HTTPException(status_code=400, detail="Auction window has closed")
+
+    # Undercut rule: a driver's subsequent bid must be strictly lower than
+    # their previous one. Drops the amount over time, creating the pressure
+    # that defines a time-decay reverse auction.
+    prev = (
+        db.query(Bid)
+        .filter(Bid.ride_id == ride_id, Bid.driver_id == user.id)
+        .order_by(Bid.created_at.desc())
+        .first()
+    )
+    if prev is not None and payload.amount >= prev.amount:
+        raise HTTPException(
+            status_code=400,
+            detail=f"New bid must be below your previous Rs {int(prev.amount)}",
+        )
+
     bid = Bid(
         ride_id=ride_id,
         driver_id=user.id,

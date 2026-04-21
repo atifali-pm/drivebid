@@ -17,6 +17,7 @@ import { useAuth } from "../src/useAuth";
 import { formatDistance, formatDuration, formatMoney } from "../src/pricing";
 import { WheelPicker } from "../src/WheelPicker";
 import { DisputeModal } from "../src/DisputeModal";
+import { AuctionTimer } from "../src/AuctionTimer";
 
 const SCREENSHOT_MODE = false;
 const MOCK_DRIVER_NAME = "Bilal Hussain";
@@ -295,6 +296,24 @@ function OpenRideCard({
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [auctionTick, setAuctionTick] = useState(() => Date.now());
+
+  const auctionClosed =
+    ride.auction_ends_at != null &&
+    auctionTick > new Date(ride.auction_ends_at).getTime();
+
+  // Re-render this card every second while the auction is open, so the
+  // closed/bid-form state flips the instant the window elapses.
+  useEffect(() => {
+    if (!ride.auction_ends_at || auctionClosed) return;
+    const t = setInterval(() => setAuctionTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [ride.auction_ends_at, auctionClosed]);
+
+  // Only expose bid amounts below the driver's previous bid (undercut rule)
+  const allowedBidValues = myBid
+    ? BID_AMOUNT_VALUES.filter((v) => v < myBid.amount)
+    : BID_AMOUNT_VALUES;
 
   async function handleBid() {
     setLoading(true);
@@ -354,23 +373,39 @@ function OpenRideCard({
         </Text>
       </Pressable>
 
-      {myBid ? (
-        <View style={styles.myBidBox}>
-          <Text style={styles.myBidText}>
-            You bid {formatMoney(myBid.amount)}
-          </Text>
-        </View>
+      <AuctionTimer
+        auctionEndsAt={ride.auction_ends_at}
+        bidCount={ride.bids.length}
+        lowestBid={
+          ride.bids.length > 0
+            ? Math.min(...ride.bids.map((b) => b.amount))
+            : null
+        }
+      />
+
+      {auctionClosed ? (
+        myBid ? (
+          <View style={styles.myBidBox}>
+            <Text style={styles.myBidText}>
+              Your final bid: {formatMoney(myBid.amount)}
+            </Text>
+          </View>
+        ) : null
       ) : expanded ? (
         <View style={styles.bidForm}>
-          {ride.estimated_fare != null && (
+          {myBid ? (
+            <Text style={[styles.suggest, { color: "#c2410c" }]}>
+              Your last bid: Rs {myBid.amount}. New bid must be lower.
+            </Text>
+          ) : ride.estimated_fare != null ? (
             <Text style={styles.suggest}>
               Suggested: {formatMoney(ride.estimated_fare)}
             </Text>
-          )}
+          ) : null}
           <View style={styles.wheelRow}>
             <Text style={styles.wheelLabel}>YOUR BID</Text>
             <WheelPicker
-              values={BID_AMOUNT_VALUES}
+              values={allowedBidValues}
               value={amount}
               onChange={setAmount}
               formatLabel={(n) => `Rs ${n}`}

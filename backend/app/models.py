@@ -85,6 +85,7 @@ class Ride(Base):
     completed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    auction_ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     rider_to_driver_stars: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rider_to_driver_comment: Mapped[str | None] = mapped_column(String, nullable=True)
     driver_to_rider_stars: Mapped[int | None] = mapped_column(Integer, nullable=True)

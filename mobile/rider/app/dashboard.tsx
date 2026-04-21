@@ -16,6 +16,7 @@ import { useAuth } from "../src/useAuth";
 import { formatDistance, formatDuration, formatMoney } from "../src/pricing";
 import { DisputeModal } from "../src/DisputeModal";
 import { LeafletMap } from "../src/LeafletMap";
+import { AuctionTimer } from "../src/AuctionTimer";
 
 function vehicleEmoji(t: string | null | undefined): string {
   return t === "motorcycle" ? "🏍️" : t === "rickshaw" ? "🛺" : t === "van" ? "🚐" : "🚗";
@@ -363,6 +364,18 @@ function RideCard({
             </View>
           )}
         </>
+      )}
+
+      {ride.status === "open" && (
+        <AuctionTimer
+          auctionEndsAt={ride.auction_ends_at}
+          bidCount={ride.bids.length}
+          lowestBid={
+            ride.bids.length > 0
+              ? Math.min(...ride.bids.map((b) => b.amount))
+              : null
+          }
+        />
       )}
 
       {ride.status === "open" && ride.bids.length > 0 && (

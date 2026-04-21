@@ -52,6 +52,7 @@ export interface Ride {
   completed_at: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
+  auction_ends_at: string | null;
   rider_to_driver_stars: number | null;
   rider_to_driver_comment: string | null;
   driver_to_rider_stars: number | null;
