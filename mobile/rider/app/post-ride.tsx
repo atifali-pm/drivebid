@@ -21,6 +21,9 @@ const RIDE_TYPES = [
   { key: "motorcycle", label: "Bike", icon: "🏍️" },
   { key: "rickshaw", label: "Rickshaw", icon: "🛺" },
   { key: "van", label: "Van", icon: "🚐" },
+  { key: "parcel", label: "Parcel", icon: "📦" },
+  { key: "freight", label: "Freight", icon: "🚛" },
+  { key: "task", label: "Task", icon: "🧰" },
 ];
 
 // Build a list of budget values from Rs 200 to Rs 5000 in Rs 10 steps
@@ -125,6 +128,9 @@ export default function PostRide() {
     motorcycle:  { base: 80,  perKm: 50,  speed: 30 },
     rickshaw:   { base: 100, perKm: 60,  speed: 20 },
     van:        { base: 250, perKm: 120, speed: 22 },
+    parcel:     { base: 120, perKm: 60,  speed: 25 },
+    freight:    { base: 500, perKm: 180, speed: 20 },
+    task:       { base: 300, perKm: 40,  speed: 25 },
   };
 
   const pricing = RIDE_PRICING[rideType] ?? RIDE_PRICING.car;

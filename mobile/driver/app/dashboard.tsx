@@ -19,6 +19,7 @@ import { WheelPicker } from "../src/WheelPicker";
 import { DisputeModal } from "../src/DisputeModal";
 import { AuctionTimer } from "../src/AuctionTimer";
 import { formatScheduledFor, isScheduled } from "../src/scheduling";
+import { rideTypeIcon, rideTypeLabel, isCompositeService } from "../src/rideTypes";
 
 const SCREENSHOT_MODE = false;
 const MOCK_DRIVER_NAME = "Bilal Hussain";
@@ -361,9 +362,7 @@ function OpenRideCard({
     <View style={styles.card}>
       <Pressable onPress={() => setExpanded((e) => !e)}>
         <View style={styles.cardHeaderRow}>
-          <Text style={styles.rideTypeIcon}>
-            {ride.ride_type === "motorcycle" ? "🏍️" : ride.ride_type === "rickshaw" ? "🛺" : ride.ride_type === "van" ? "🚐" : "🚗"}
-          </Text>
+          <Text style={styles.rideTypeIcon}>{rideTypeIcon(ride.ride_type)}</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardRoute}>{ride.pickup} → {ride.dropoff}</Text>
             {isScheduled(ride.scheduled_for) && (
