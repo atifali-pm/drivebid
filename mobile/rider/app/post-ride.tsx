@@ -26,6 +26,16 @@ const RIDE_TYPES = [
 // Build a list of budget values from Rs 200 to Rs 5000 in Rs 10 steps
 const BUDGET_VALUES = Array.from({ length: 481 }, (_, i) => 200 + i * 10);
 
+const SCHEDULE_OFFSETS: { label: string; min: number | null }[] = [
+  { label: "Now", min: null },
+  { label: "In 30 min", min: 30 },
+  { label: "In 1 hour", min: 60 },
+  { label: "In 2 hours", min: 120 },
+  { label: "In 4 hours", min: 240 },
+  { label: "In 12 hours", min: 720 },
+  { label: "Tomorrow", min: 1440 },
+];
+
 export default function PostRide() {
   const router = useRouter();
   const mapRef = useRef<LeafletMapHandle | null>(null);
@@ -39,6 +49,8 @@ export default function PostRide() {
   const [rideType, setRideType] = useState("car");
   const [notes, setNotes] = useState("");
   const [poolOk, setPoolOk] = useState(false);
+  // "now" plus one of the preset offsets; null means go immediately.
+  const [scheduleOffsetMin, setScheduleOffsetMin] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -164,6 +176,10 @@ export default function PostRide() {
         ride_type: rideType,
         notes,
         pool_ok: poolOk,
+        scheduled_for:
+          scheduleOffsetMin != null
+            ? new Date(Date.now() + scheduleOffsetMin * 60_000).toISOString()
+            : null,
       });
       router.back();
     } catch (err) {
@@ -331,6 +347,29 @@ export default function PostRide() {
             formatLabel={(n) => `Rs ${n.toLocaleString()}`}
           />
         </View>
+
+        <Text style={styles.label}>When do you want to go?</Text>
+        <View style={styles.scheduleRow}>
+          {SCHEDULE_OFFSETS.map((opt) => {
+            const on = scheduleOffsetMin === opt.min;
+            return (
+              <Pressable
+                key={opt.label}
+                onPress={() => setScheduleOffsetMin(opt.min)}
+                style={[styles.scheduleChip, on && styles.scheduleChipOn]}
+              >
+                <Text style={[styles.scheduleChipText, on && styles.scheduleChipTextOn]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {scheduleOffsetMin != null && scheduleOffsetMin > 0 && (
+          <Text style={styles.scheduleHint}>
+            Drivers can bid until about 5 min before departure.
+          </Text>
+        )}
 
         <Pressable
           style={[styles.poolRow, poolOk && styles.poolRowOn]}
@@ -503,6 +542,33 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     paddingHorizontal: 4,
     marginBottom: 14,
+  },
+  scheduleRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 4,
+  },
+  scheduleChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#fff",
+  },
+  scheduleChipOn: {
+    borderColor: "#06b6d4",
+    backgroundColor: "#ecfeff",
+  },
+  scheduleChipText: { fontSize: 12, color: "#64748b", fontWeight: "600" },
+  scheduleChipTextOn: { color: "#0891b2", fontWeight: "800" },
+  scheduleHint: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 4,
+    marginBottom: 10,
+    fontStyle: "italic",
   },
   poolRow: {
     flexDirection: "row",

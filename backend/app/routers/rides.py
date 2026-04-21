@@ -89,6 +89,16 @@ def create_ride(
     db: Session = Depends(get_db),
     user: User = Depends(require_role(UserRole.rider)),
 ):
+    # Auction window: for same-now rides it's 60s after posting. For
+    # scheduled rides (pre-bid the night before etc.) the window stays
+    # open until ~5 minutes before departure, giving drivers a much
+    # longer bidding runway.
+    now = datetime.utcnow()
+    if payload.scheduled_for is not None and payload.scheduled_for > now + timedelta(minutes=10):
+        auction_end = payload.scheduled_for - timedelta(minutes=5)
+    else:
+        auction_end = now + timedelta(seconds=AUCTION_WINDOW_SECONDS)
+
     ride = Ride(
         rider_id=user.id,
         pickup=payload.pickup,
@@ -104,7 +114,8 @@ def create_ride(
         ride_type=payload.ride_type,
         notes=payload.notes,
         pool_ok=payload.pool_ok,
-        auction_ends_at=datetime.utcnow() + timedelta(seconds=AUCTION_WINDOW_SECONDS),
+        scheduled_for=payload.scheduled_for,
+        auction_ends_at=auction_end,
     )
     db.add(ride)
     db.commit()

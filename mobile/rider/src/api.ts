@@ -76,6 +76,7 @@ export interface Ride {
   ride_type: string;
   notes: string;
   pool_ok: boolean;
+  scheduled_for: string | null;
   status: RideStatus;
   accepted_bid_id: number | null;
   started_at: string | null;
@@ -200,6 +201,7 @@ export const api = {
     ride_type?: string;
     notes?: string;
     pool_ok?: boolean;
+    scheduled_for?: string | null;
   }) =>
     request<Ride>("/rides", { method: "POST", body: JSON.stringify(data) }),
 

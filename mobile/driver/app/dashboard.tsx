@@ -18,6 +18,7 @@ import { formatDistance, formatDuration, formatMoney } from "../src/pricing";
 import { WheelPicker } from "../src/WheelPicker";
 import { DisputeModal } from "../src/DisputeModal";
 import { AuctionTimer } from "../src/AuctionTimer";
+import { formatScheduledFor, isScheduled } from "../src/scheduling";
 
 const SCREENSHOT_MODE = false;
 const MOCK_DRIVER_NAME = "Bilal Hussain";
@@ -365,6 +366,11 @@ function OpenRideCard({
           </Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardRoute}>{ride.pickup} → {ride.dropoff}</Text>
+            {isScheduled(ride.scheduled_for) && (
+              <Text style={styles.schedulePill}>
+                🕒 {formatScheduledFor(ride.scheduled_for)}
+              </Text>
+            )}
           </View>
           <Text style={styles.expandChevron}>{expanded ? "▲" : "▼"}</Text>
           <Pressable
@@ -628,6 +634,19 @@ const styles = StyleSheet.create({
   rideTypeIcon: { fontSize: 24, marginRight: 4 },
   cardHeaderRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   cardRoute: { fontSize: 14, fontWeight: "600", color: "#1e293b", marginBottom: 2 },
+  schedulePill: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#0891b2",
+    backgroundColor: "#cffafe",
+    alignSelf: "flex-start",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    marginTop: 2,
+    marginBottom: 2,
+    overflow: "hidden",
+  },
   archiveBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,

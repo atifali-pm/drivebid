@@ -111,6 +111,7 @@ class RideCreate(BaseModel):
     ride_type: str = "car"
     notes: str = ""
     pool_ok: bool = False
+    scheduled_for: datetime | None = None
 
 
 class BidOut(BaseModel):
@@ -159,6 +160,7 @@ class RideOut(BaseModel):
     cancelled_at: datetime | None = None
     cancelled_by: str | None = None
     auction_ends_at: datetime | None = None
+    scheduled_for: datetime | None = None
     pool_ok: bool = False
     rider_to_driver_stars: int | None = None
     rider_to_driver_comment: str | None = None

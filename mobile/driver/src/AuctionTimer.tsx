@@ -21,18 +21,32 @@ export function AuctionTimer({ auctionEndsAt, bidCount, lowestBid }: Props) {
   const remaining = Math.max(0, Math.ceil((end - now) / 1000));
   const closed = remaining === 0;
 
+  function fmt(s: number): string {
+    if (s < 60) return `${s}s`;
+    if (s < 3600) return `${Math.floor(s / 60)}m`;
+    if (s < 86400) {
+      const h = Math.floor(s / 3600);
+      const m = Math.floor((s % 3600) / 60);
+      return m > 0 ? `${h}h ${m}m` : `${h}h`;
+    }
+    const d = Math.floor(s / 86400);
+    return d === 1 ? "1 day" : `${d} days`;
+  }
+
+  const showRing = !closed && remaining <= 60;
+
   return (
     <View style={[styles.box, closed ? styles.boxClosed : styles.boxOpen]}>
       <View style={{ flex: 1 }}>
         <Text style={closed ? styles.labelClosed : styles.label}>
-          {closed ? "Auction closed" : `Closes in ${remaining}s`}
+          {closed ? "Auction closed" : `Closes in ${fmt(remaining)}`}
         </Text>
         <Text style={styles.meta}>
           {bidCount} bid{bidCount === 1 ? "" : "s"}
-          {lowestBid != null && ` , lowest Rs ${lowestBid.toLocaleString()}`}
+          {lowestBid != null && `, lowest Rs ${lowestBid.toLocaleString()}`}
         </Text>
       </View>
-      {!closed && (
+      {showRing && (
         <View style={styles.ringOuter}>
           <Text style={styles.ringText}>{remaining}</Text>
         </View>
