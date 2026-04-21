@@ -5,6 +5,7 @@ AUCTION_WINDOW_SECONDS = 60
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import Integer
 from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user, require_role
@@ -45,6 +46,68 @@ def _driver_stats(driver_id: int, db) -> tuple[float | None, int]:
     return avg_rating, trip_count
 
 
+def _driver_trust_score(driver_id: int, db) -> float | None:
+    """Composite reputation in the 0..100 range.
+
+    - 50 pts from star rating (5 stars == full 50)
+    - 20 pts from trip volume (100 accepted trips == full 20, linear)
+    - up to -20 penalty for cancellation rate on accepted rides
+    - up to -20 penalty for open dispute rate
+    - up to +10 reward for completion rate (completed / accepted)
+
+    Returns None when there's no accepted ride yet (not enough signal).
+    """
+    from sqlalchemy import func
+    from ..models import Dispute
+
+    accepted_count, completed_count, cancelled_count = db.query(
+        func.count(Ride.id),
+        func.sum(
+            func.coalesce(
+                (Ride.status == RideStatus.completed).cast(Integer), 0
+            )
+        ),
+        func.sum(
+            func.coalesce(
+                (Ride.status == RideStatus.cancelled).cast(Integer), 0
+            )
+        ),
+    ).join(Bid, Bid.ride_id == Ride.id).filter(
+        Bid.driver_id == driver_id,
+        Ride.accepted_bid_id == Bid.id,
+    ).first() or (0, 0, 0)
+
+    accepted = accepted_count or 0
+    if accepted == 0:
+        return None
+    completed = completed_count or 0
+    cancelled = cancelled_count or 0
+
+    avg_rating, _ = _driver_stats(driver_id, db)
+    rating_pts = 50 * (avg_rating / 5.0) if avg_rating is not None else 25
+
+    volume_pts = min(20.0, completed / 5.0)
+
+    cancellation_rate = cancelled / accepted if accepted else 0
+    completion_rate = completed / accepted if accepted else 0
+
+    dispute_count = (
+        db.query(func.count(Dispute.id))
+        .filter(Dispute.user_id == driver_id, Dispute.status == "open")
+        .scalar() or 0
+    )
+    dispute_rate = min(1.0, dispute_count / max(1, accepted))
+
+    score = (
+        rating_pts
+        + volume_pts
+        - 20 * cancellation_rate
+        - 20 * dispute_rate
+        + 10 * completion_rate
+    )
+    return round(max(0.0, min(100.0, score)), 1)
+
+
 def _ride_to_out(ride: Ride, db=None) -> RideOut:
     data = RideOut.model_validate(ride)
     data.rider_name = ride.rider.full_name if ride.rider else None
@@ -53,8 +116,10 @@ def _ride_to_out(ride: Ride, db=None) -> RideOut:
         rating, trips = (None, 0)
         driver_lat: float | None = None
         driver_lng: float | None = None
+        trust: float | None = None
         if db and b.driver:
             rating, trips = _driver_stats(b.driver_id, db)
+            trust = _driver_trust_score(b.driver_id, db)
             loc = db.get(DriverLocation, b.driver_id)
             if loc is not None:
                 driver_lat = loc.lat
@@ -70,6 +135,7 @@ def _ride_to_out(ride: Ride, db=None) -> RideOut:
             driver_vehicle_plate=b.driver.vehicle_plate if b.driver else None,
             driver_rating=rating,
             driver_trip_count=trips,
+            driver_trust_score=trust,
             driver_lat=driver_lat,
             driver_lng=driver_lng,
             amount=b.amount,

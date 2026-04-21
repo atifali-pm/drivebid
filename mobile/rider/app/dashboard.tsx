@@ -440,7 +440,10 @@ function RideCard({
                   </Text>
                   <Text style={styles.bidMeta}>
                     ETA {bid.eta_minutes}m
-                    {bid.pool_key ? " · shared bid with another rider" : ""}
+                    {bid.driver_rating != null && ` · ★ ${bid.driver_rating}`}
+                    {bid.driver_trust_score != null &&
+                      ` · Trust ${Math.round(bid.driver_trust_score)}`}
+                    {bid.pool_key ? " · shared" : ""}
                     {bid.message ? ` · ${bid.message}` : ""}
                   </Text>
                 </View>
