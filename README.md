@@ -191,71 +191,32 @@ Both sides rate each other. One rating per side, locked once submitted.
 
 ## Roadmap
 
-- [x] **Phase 1** — Web prototype: bidding, lifecycle, maps, ratings
-- [x] **Phase 2** — Live WebSocket updates (bids, driver location, chat)
-- [x] **Phase 3** — Android apps (rider + driver, native Expo)
-- [x] **Phase 4** — Public web + Android APK distribution (Render + Vercel + GitHub Releases)
-- [ ] **Phase 5** — Real payment rails (JazzCash / Easypaisa / Stripe)
-- [ ] **Phase 6** — iOS apps
-- [ ] **Reverse auction with time decay** — drivers bid *down* over 60s for urgency
-- [ ] **Driver pools** — carpool bundling, multiple riders share a single winning bid
-- [ ] **Scheduled rides** — pre-bid tomorrow morning the night before (solves commute surge)
-- [ ] **Composite services** — parcel, freight, and tasks under the same bid engine
-- [ ] **Trust score** — composite reputation (not just stars)
-- [ ] **Offline-first driver app** — SMS fallback for poor-signal areas
-- [ ] **Play Store submission** — signed release APKs + data safety form
+### Shipped
+
+- ✅ Web prototype — bidding, lifecycle, real maps, two-way ratings
+- ✅ Live WebSocket updates — bids, driver location, in-ride chat
+- ✅ Android apps — rider + driver, native Expo, open to the public
+- ✅ Public distribution — web on Vercel, APKs on GitHub Releases, backend on Render
+- ✅ Pre-accept bidder map — riders see each driver's location before accepting
+- ✅ Cash-aware trip lifecycle with disputes + vehicle types
+- ✅ WhatsApp-style archived-rides screen for drivers
+
+### Next up
+
+- [ ] **Real payment rails** — JazzCash / Easypaisa / Stripe
+- [ ] **Play Store submission** — signed release APKs + data-safety form
+- [ ] **iOS apps** — same Expo codebase, App Store build + TestFlight
+
+### On the idea board
+
+- **Reverse auction with time decay** — drivers bid *down* over 60s for urgency
+- **Driver pools** — carpool bundling, multiple riders share a single winning bid
+- **Scheduled rides** — pre-bid tomorrow morning the night before (solves commute surge)
+- **Composite services** — parcel, freight, and tasks under the same bid engine
+- **Trust score** — composite reputation beyond stars
+- **Offline-first driver app** — SMS fallback for poor-signal areas
 
 ---
-
-## Running locally
-
-<details>
-<summary>Click to expand</summary>
-
-### 1. Map `drivebid.local` to localhost
-
-```bash
-echo "127.0.0.1 drivebid.local" | sudo tee -a /etc/hosts
-```
-
-### 2. Backend (port 8050)
-
-```bash
-cd backend
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-uvicorn app.main:app --port 8050 --host 127.0.0.1
-```
-
-API docs at http://drivebid.local:8050/docs
-
-### 3. Web frontend (port 5173)
-
-```bash
-cd frontend
-npm install
-npm run dev -- --host drivebid.local --port 5173
-```
-
-Open http://drivebid.local:5173 and register one rider + one driver (try in two browser windows) to test the full flow end-to-end.
-
-### 4. Mobile apps (Expo Go)
-
-```bash
-# Rider
-cd mobile/rider
-npm install --legacy-peer-deps
-npx expo start --lan --port 8082
-
-# Driver (in another terminal)
-cd mobile/driver
-npm install --legacy-peer-deps
-npx expo start --lan --port 8083
-```
-
-Scan the QR codes in Expo Go. The apps auto-detect your laptop's LAN IP and hit the local backend at `:8050`.
-
-</details>
 
 ## License
 
