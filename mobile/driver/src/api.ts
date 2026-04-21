@@ -29,8 +29,19 @@ export type RideStatus =
 export interface User {
   id: number;
   email: string;
+  phone?: string | null;
   full_name: string;
   role: UserRole;
+  vehicle_type?: string | null;
+  vehicle_model?: string | null;
+  vehicle_color?: string | null;
+  vehicle_plate?: string | null;
+  min_fare?: number | null;
+  rate_per_km?: number | null;
+  rate_per_min?: number | null;
+  is_online?: boolean;
+  sms_fallback_enabled?: boolean;
+  sms_phone?: string | null;
   created_at: string;
 }
 

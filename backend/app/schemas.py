@@ -45,6 +45,8 @@ class UserOut(BaseModel):
     rate_per_km: float | None = None
     rate_per_min: float | None = None
     referral_code: str | None = None
+    sms_fallback_enabled: bool = False
+    sms_phone: str | None = None
     created_at: datetime
 
 
@@ -58,6 +60,8 @@ class ProfileUpdate(BaseModel):
     min_fare: float | None = None
     rate_per_km: float | None = None
     rate_per_min: float | None = None
+    sms_fallback_enabled: bool | None = None
+    sms_phone: str | None = None
 
 
 class DriverVerification(BaseModel):

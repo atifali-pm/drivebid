@@ -56,6 +56,10 @@ class User(Base):
     rate_per_min: Mapped[float | None] = mapped_column(Float, nullable=True)
     referral_code: Mapped[str | None] = mapped_column(String, unique=True, nullable=True)
     referred_by: Mapped[int | None] = mapped_column(ForeignKey("users.id"), nullable=True)
+    sms_fallback_enabled: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default="false"
+    )
+    sms_phone: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     rides: Mapped[list["Ride"]] = relationship(back_populates="rider", foreign_keys="Ride.rider_id")
