@@ -215,9 +215,3 @@ Both sides rate each other. One rating per side, locked once submitted.
 - **Composite services** — parcel, freight, and tasks under the same bid engine
 - **Trust score** — composite reputation beyond stars
 - **Offline-first driver app** — SMS fallback for poor-signal areas
-
----
-
-## License
-
-Unlicensed prototype — not for production use.
