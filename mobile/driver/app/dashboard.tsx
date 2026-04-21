@@ -233,25 +233,45 @@ export default function Dashboard() {
         contentContainerStyle={{ paddingBottom: 20 }}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
-          archivedRides.length > 0 ? (
-            <Pressable
-              style={styles.archiveRow}
-              android_ripple={{ color: "rgba(148,163,184,0.2)" }}
-              onPress={() => router.push("/archived")}
-            >
-              <View style={styles.archiveIconWrap}>
-                <Text style={styles.archiveIcon}>📦</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.archiveRowTitle}>Archived</Text>
-                <Text style={styles.archiveRowSub}>
-                  {archivedRides.length} ride
-                  {archivedRides.length === 1 ? "" : "s"}
-                </Text>
-              </View>
-              <Text style={styles.archiveChevron}>›</Text>
-            </Pressable>
-          ) : null
+          <View>
+            {openRides.filter((r) => r.pool_ok).length >= 2 && (
+              <Pressable
+                style={styles.poolRow}
+                android_ripple={{ color: "rgba(6,182,212,0.2)" }}
+                onPress={() => router.push("/pool-bid")}
+              >
+                <View style={styles.poolIconWrap}>
+                  <Text style={styles.poolIcon}>🪑</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.poolRowTitle}>Pool bid</Text>
+                  <Text style={styles.poolRowSub}>
+                    {openRides.filter((r) => r.pool_ok).length} rides open to sharing
+                  </Text>
+                </View>
+                <Text style={styles.archiveChevron}>›</Text>
+              </Pressable>
+            )}
+            {archivedRides.length > 0 && (
+              <Pressable
+                style={styles.archiveRow}
+                android_ripple={{ color: "rgba(148,163,184,0.2)" }}
+                onPress={() => router.push("/archived")}
+              >
+                <View style={styles.archiveIconWrap}>
+                  <Text style={styles.archiveIcon}>📦</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.archiveRowTitle}>Archived</Text>
+                  <Text style={styles.archiveRowSub}>
+                    {archivedRides.length} ride
+                    {archivedRides.length === 1 ? "" : "s"}
+                  </Text>
+                </View>
+                <Text style={styles.archiveChevron}>›</Text>
+              </Pressable>
+            )}
+          </View>
         }
       />
       {toast && (
@@ -360,7 +380,12 @@ function OpenRideCard({
         </View>
         <View style={styles.budgetBanner}>
           <Text style={styles.budgetBannerLabel}>MAX BUDGET</Text>
-          <Text style={styles.budgetBannerAmount}>{formatMoney(ride.max_budget)}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            {ride.pool_ok && (
+              <Text style={styles.poolBadge}>POOL OK</Text>
+            )}
+            <Text style={styles.budgetBannerAmount}>{formatMoney(ride.max_budget)}</Text>
+          </View>
         </View>
         <Text style={styles.cardMeta}>
           {ride.rider_name}
@@ -721,6 +746,42 @@ const styles = StyleSheet.create({
   },
   paidText: { color: "#047857", fontSize: 12, fontWeight: "700" },
   reportLink: { color: "#dc2626", fontSize: 11, fontWeight: "600" },
+  poolRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ecfeff",
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#06b6d4",
+  },
+  poolIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#cffafe",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  poolIcon: { fontSize: 18 },
+  poolRowTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  poolRowSub: { fontSize: 12, color: "#0891b2", marginTop: 2 },
+  poolBadge: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#0891b2",
+    backgroundColor: "#cffafe",
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    letterSpacing: 0.5,
+    overflow: "hidden",
+  },
   archiveRow: {
     flexDirection: "row",
     alignItems: "center",

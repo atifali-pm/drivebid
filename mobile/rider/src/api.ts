@@ -55,6 +55,7 @@ export interface Bid {
   eta_minutes: number;
   message: string;
   status: "pending" | "accepted" | "rejected";
+  pool_key: string | null;
   created_at: string;
 }
 
@@ -74,6 +75,7 @@ export interface Ride {
   max_budget: number;
   ride_type: string;
   notes: string;
+  pool_ok: boolean;
   status: RideStatus;
   accepted_bid_id: number | null;
   started_at: string | null;
@@ -197,6 +199,7 @@ export const api = {
     max_budget: number;
     ride_type?: string;
     notes?: string;
+    pool_ok?: boolean;
   }) =>
     request<Ride>("/rides", { method: "POST", body: JSON.stringify(data) }),
 

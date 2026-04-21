@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from uuid import uuid4
 
 AUCTION_WINDOW_SECONDS = 60
 
@@ -75,6 +76,7 @@ def _ride_to_out(ride: Ride, db=None) -> RideOut:
             eta_minutes=b.eta_minutes,
             message=b.message,
             status=b.status,
+            pool_key=b.pool_key,
             created_at=b.created_at,
         ))
     return data
@@ -101,6 +103,7 @@ def create_ride(
         max_budget=payload.max_budget,
         ride_type=payload.ride_type,
         notes=payload.notes,
+        pool_ok=payload.pool_ok,
         auction_ends_at=datetime.utcnow() + timedelta(seconds=AUCTION_WINDOW_SECONDS),
     )
     db.add(ride)
@@ -290,8 +293,109 @@ def place_bid(
         eta_minutes=bid.eta_minutes,
         message=bid.message,
         status=bid.status,
+        pool_key=bid.pool_key,
         created_at=bid.created_at,
     )
+
+
+class PoolBidCreate(BaseModel):
+    ride_ids: list[int]
+    amount_per_seat: float
+    eta_minutes: int
+    message: str = ""
+
+
+@router.post("/bids/pool", response_model=list[BidOut], status_code=201)
+def place_pool_bid(
+    payload: PoolBidCreate,
+    bg: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.driver)),
+):
+    """Place the same per-seat bid on a bundle of pool-OK open rides.
+
+    All rides must be pool_ok, open, and inside their auction window. Each
+    bid on a ride from the same driver must undercut the driver's previous
+    bid on that ride (if any). Bids share a pool_key so the frontend can
+    show them as a pooled offer.
+    """
+    if len(payload.ride_ids) < 2:
+        raise HTTPException(status_code=400, detail="Pool bid needs at least 2 rides")
+    if payload.amount_per_seat <= 0 or payload.eta_minutes <= 0:
+        raise HTTPException(status_code=400, detail="Invalid bid values")
+
+    now = datetime.utcnow()
+    rides = db.query(Ride).filter(Ride.id.in_(payload.ride_ids)).all()
+    if len(rides) != len(set(payload.ride_ids)):
+        raise HTTPException(status_code=404, detail="One or more rides not found")
+
+    for r in rides:
+        if r.status != RideStatus.open:
+            raise HTTPException(status_code=400, detail=f"Ride {r.id} is no longer open")
+        if not r.pool_ok:
+            raise HTTPException(status_code=400, detail=f"Ride {r.id} is not pool-eligible")
+        if r.auction_ends_at is not None and now > r.auction_ends_at:
+            raise HTTPException(status_code=400, detail=f"Ride {r.id} auction has closed")
+        if payload.amount_per_seat > r.max_budget:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Bid Rs {int(payload.amount_per_seat)} exceeds Rs {int(r.max_budget)} max on ride {r.id}",
+            )
+        prev = (
+            db.query(Bid)
+            .filter(Bid.ride_id == r.id, Bid.driver_id == user.id)
+            .order_by(Bid.created_at.desc())
+            .first()
+        )
+        if prev is not None and payload.amount_per_seat >= prev.amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ride {r.id}: new bid must be below your previous Rs {int(prev.amount)}",
+            )
+
+    pool_key = uuid4().hex
+    created: list[Bid] = []
+    for r in rides:
+        b = Bid(
+            ride_id=r.id,
+            driver_id=user.id,
+            amount=payload.amount_per_seat,
+            eta_minutes=payload.eta_minutes,
+            message=payload.message,
+            pool_key=pool_key,
+        )
+        db.add(b)
+        created.append(b)
+    db.commit()
+    for b in created:
+        db.refresh(b)
+
+    for r in rides:
+        bg.add_task(manager.send_to_user, r.rider_id, REFRESH)
+        bg.add_task(
+            send_push, db, r.rider_id,
+            "Pool bid offered",
+            f"{user.full_name} offered Rs {int(payload.amount_per_seat)}/seat in a shared ride",
+            {"type": "pool_bid", "ride_id": r.id, "pool_key": pool_key},
+        )
+    return [
+        BidOut(
+            id=b.id,
+            ride_id=b.ride_id,
+            driver_id=b.driver_id,
+            driver_name=user.full_name,
+            driver_vehicle_type=user.vehicle_type,
+            driver_vehicle_model=user.vehicle_model,
+            driver_vehicle_plate=user.vehicle_plate,
+            amount=b.amount,
+            eta_minutes=b.eta_minutes,
+            message=b.message,
+            status=b.status,
+            pool_key=b.pool_key,
+            created_at=b.created_at,
+        )
+        for b in created
+    ]
 
 
 @router.post("/{ride_id}/accept/{bid_id}", response_model=RideOut)

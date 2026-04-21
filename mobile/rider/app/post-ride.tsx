@@ -38,6 +38,7 @@ export default function PostRide() {
   const [budget, setBudget] = useState<number>(1500);
   const [rideType, setRideType] = useState("car");
   const [notes, setNotes] = useState("");
+  const [poolOk, setPoolOk] = useState(false);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -162,6 +163,7 @@ export default function PostRide() {
         max_budget: budget,
         ride_type: rideType,
         notes,
+        pool_ok: poolOk,
       });
       router.back();
     } catch (err) {
@@ -330,6 +332,22 @@ export default function PostRide() {
           />
         </View>
 
+        <Pressable
+          style={[styles.poolRow, poolOk && styles.poolRowOn]}
+          onPress={() => setPoolOk((v) => !v)}
+        >
+          <View style={[styles.poolBox, poolOk && styles.poolBoxOn]}>
+            {poolOk && <Text style={styles.poolTick}>✓</Text>}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.poolTitle}>Happy to share the ride (pool)</Text>
+            <Text style={styles.poolSub}>
+              Drivers can offer a shared bid with another rider going your way.
+              Cheaper if matched, normal bids still come in either way.
+            </Text>
+          </View>
+        </Pressable>
+
         <Text style={styles.label}>Notes for driver</Text>
         <TextInput
           style={styles.notes}
@@ -486,6 +504,36 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     marginBottom: 14,
   },
+  poolRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
+    marginBottom: 14,
+    marginTop: 6,
+  },
+  poolRowOn: {
+    borderColor: "#06b6d4",
+    backgroundColor: "#ecfeff",
+  },
+  poolBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: "#cbd5e1",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  poolBoxOn: { borderColor: "#06b6d4", backgroundColor: "#06b6d4" },
+  poolTick: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  poolTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  poolSub: { fontSize: 11, color: "#64748b", marginTop: 2 },
   notes: {
     borderWidth: 1,
     borderColor: "#e2e8f0",

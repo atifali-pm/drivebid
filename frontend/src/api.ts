@@ -46,6 +46,7 @@ export interface Ride {
   estimated_fare: number | null;
   max_budget: number;
   notes: string;
+  pool_ok: boolean;
   status: RideStatus;
   accepted_bid_id: number | null;
   started_at: string | null;

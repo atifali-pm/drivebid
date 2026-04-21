@@ -86,6 +86,7 @@ class Ride(Base):
     cancelled_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     cancelled_by: Mapped[str | None] = mapped_column(String, nullable=True)
     auction_ends_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    pool_ok: Mapped[bool] = mapped_column(Boolean, default=False, server_default="false")
     rider_to_driver_stars: Mapped[int | None] = mapped_column(Integer, nullable=True)
     rider_to_driver_comment: Mapped[str | None] = mapped_column(String, nullable=True)
     driver_to_rider_stars: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -110,6 +111,7 @@ class Bid(Base):
     eta_minutes: Mapped[int] = mapped_column(Integer, nullable=False)
     message: Mapped[str] = mapped_column(String, default="")
     status: Mapped[BidStatus] = mapped_column(Enum(BidStatus), default=BidStatus.pending)
+    pool_key: Mapped[str | None] = mapped_column(String, nullable=True, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
     ride: Mapped["Ride"] = relationship(back_populates="bids", foreign_keys=[ride_id])

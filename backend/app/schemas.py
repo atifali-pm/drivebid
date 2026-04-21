@@ -110,6 +110,7 @@ class RideCreate(BaseModel):
     max_budget: float
     ride_type: str = "car"
     notes: str = ""
+    pool_ok: bool = False
 
 
 class BidOut(BaseModel):
@@ -130,6 +131,7 @@ class BidOut(BaseModel):
     eta_minutes: int
     message: str
     status: BidStatus
+    pool_key: str | None = None
     created_at: datetime
 
 
@@ -157,6 +159,7 @@ class RideOut(BaseModel):
     cancelled_at: datetime | None = None
     cancelled_by: str | None = None
     auction_ends_at: datetime | None = None
+    pool_ok: bool = False
     rider_to_driver_stars: int | None = None
     rider_to_driver_comment: str | None = None
     driver_to_rider_stars: int | None = None

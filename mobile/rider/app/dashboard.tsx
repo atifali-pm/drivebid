@@ -427,10 +427,15 @@ function RideCard({
                 <View style={{ flex: 1 }}>
                   <Text style={styles.bidDriver}>
                     {bid.driver_vehicle_type === "motorcycle" ? "🏍️" : bid.driver_vehicle_type === "rickshaw" ? "🛺" : bid.driver_vehicle_type === "van" ? "🚐" : "🚗"}{" "}
-                    {bid.driver_name ?? "Driver"} — {formatMoney(bid.amount)}
+                    {bid.driver_name ?? "Driver"} , {formatMoney(bid.amount)}
+                    {bid.pool_key && (
+                      <Text style={styles.poolTag}>  POOL</Text>
+                    )}
                   </Text>
                   <Text style={styles.bidMeta}>
-                    ETA {bid.eta_minutes}m{bid.message ? ` · ${bid.message}` : ""}
+                    ETA {bid.eta_minutes}m
+                    {bid.pool_key ? " · shared bid with another rider" : ""}
+                    {bid.message ? ` · ${bid.message}` : ""}
                   </Text>
                 </View>
                 <Pressable
@@ -606,6 +611,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   bidDriver: { fontSize: 14, fontWeight: "500", color: "#1e293b" },
+  poolTag: { fontSize: 10, fontWeight: "800", color: "#0891b2" },
   bidMeta: { fontSize: 11, color: "#94a3b8" },
   acceptBtn: {
     backgroundColor: "#0ea5e9",
