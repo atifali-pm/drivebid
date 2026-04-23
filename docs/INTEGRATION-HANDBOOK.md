@@ -2,6 +2,8 @@
 
 Zero-to-production deploy for DriveBid. FastAPI backend + React SPA frontend + two Expo mobile apps (rider + driver), hosted on free tiers only. Monthly cost target: **$0**.
 
+> **Historical note (2026-04-19).** The original plan targeted Fly.io for the backend. The Fly.io account was flagged as high-risk during `flyctl launch`, so we pivoted to Render mid-deploy. The `flyctl` commands below are kept for reference but were never executed. Actual prod URLs have been updated in this doc to `drivebid-api.onrender.com`. A step-by-step with what actually worked lives in the session's project memory (`project_deploy_state.md`).
+
 This document is self-contained. A fresh Claude session with access to the `/home/atif/projects/drivebid` directory can follow it end to end without any other context.
 
 ---
@@ -289,9 +291,9 @@ Deploy:
 flyctl deploy --app drivebid-api
 ```
 
-Takes ~2 minutes. Output includes the public URL: `https://drivebid-api.fly.dev`.
+Takes ~2 minutes. Output includes the public URL: `https://drivebid-api.onrender.com`.
 
-Verify: `curl https://drivebid-api.fly.dev/health` should return `{"status": "ok", "service": "drivebid"}`.
+Verify: `curl https://drivebid-api.onrender.com/health` should return `{"status": "ok", "service": "drivebid"}`.
 
 ### Step 6: tighten CORS for production
 
@@ -326,8 +328,8 @@ vercel link --yes               # creates a Vercel project named after directory
 Set the one env var the frontend needs (the backend URL):
 
 ```bash
-vercel env add VITE_API_BASE_URL production <<< "https://drivebid-api.fly.dev"
-vercel env add VITE_API_BASE_URL preview    <<< "https://drivebid-api.fly.dev"
+vercel env add VITE_API_BASE_URL production <<< "https://drivebid-api.onrender.com"
+vercel env add VITE_API_BASE_URL preview    <<< "https://drivebid-api.onrender.com"
 ```
 
 **In the frontend code**, make sure `src/api.ts` (or equivalent) reads from `import.meta.env.VITE_API_BASE_URL`. If not already, refactor:
@@ -567,11 +569,11 @@ gh secret set FIREBASE_SERVICE_ACCOUNT_B64 --repo <owner>/drivebid \
 
 # Production API URL (the Fly.io app URL)
 gh variable set EXPO_PUBLIC_API_URL --repo <owner>/drivebid \
-  --body "https://drivebid-api.fly.dev"
+  --body "https://drivebid-api.onrender.com"
 
 # WebSocket URL
 gh variable set EXPO_PUBLIC_WS_URL --repo <owner>/drivebid \
-  --body "wss://drivebid-api.fly.dev/ws"
+  --body "wss://drivebid-api.onrender.com/ws"
 ```
 
 ### Step 11: trigger first APK builds
@@ -619,15 +621,15 @@ jobs:
 ## Verification checklist
 
 ### Backend
-- [ ] `curl https://drivebid-api.fly.dev/health` returns `{"status":"ok"}`
-- [ ] `curl https://drivebid-api.fly.dev/docs` renders FastAPI's Swagger UI
+- [ ] `curl https://drivebid-api.onrender.com/health` returns `{"status":"ok"}`
+- [ ] `curl https://drivebid-api.onrender.com/docs` renders FastAPI's Swagger UI
 - [ ] Neon dashboard shows tables created (users, rides, etc.)
 - [ ] Login via `POST /auth/login` with a seeded user returns a JWT
 
 ### Frontend
 - [ ] `https://drivebid.vercel.app` loads without console errors
 - [ ] Login flow on web works end-to-end
-- [ ] Browser DevTools Network tab shows requests going to `drivebid-api.fly.dev`
+- [ ] Browser DevTools Network tab shows requests going to `drivebid-api.onrender.com`
 
 ### Mobile
 - [ ] Both APKs downloadable from GitHub Releases
