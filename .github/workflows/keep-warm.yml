@@ -1,0 +1,29 @@
+name: Keep Render backend warm
+
+# Render's free web service spins down after ~15 minutes of inactivity,
+# and the next request then pays a 30-60s cold-start. Hitting /health
+# every 10 minutes keeps it warm so real users never see the cold path.
+# GitHub Actions cron is unreliable by a few minutes under load, so the
+# real cadence is looser than the schedule suggests, but good enough.
+on:
+  schedule:
+    - cron: "*/10 * * * *"
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Hit /health
+        run: |
+          url="https://drivebid-api.onrender.com/health"
+          echo "Pinging $url"
+          # --retry handles the first ping after a real cold-start.
+          # --max-time 70 covers the worst-case ~60s wake.
+          curl --silent --show-error --fail \
+               --retry 2 --retry-delay 5 \
+               --max-time 70 \
+               "$url"
+          echo
+          echo "ok"
