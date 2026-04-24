@@ -45,6 +45,8 @@ class UserOut(BaseModel):
     rate_per_km: float | None = None
     rate_per_min: float | None = None
     referral_code: str | None = None
+    sms_fallback_enabled: bool = False
+    sms_phone: str | None = None
     created_at: datetime
 
 
@@ -58,6 +60,8 @@ class ProfileUpdate(BaseModel):
     min_fare: float | None = None
     rate_per_km: float | None = None
     rate_per_min: float | None = None
+    sms_fallback_enabled: bool | None = None
+    sms_phone: str | None = None
 
 
 class DriverVerification(BaseModel):
@@ -110,6 +114,8 @@ class RideCreate(BaseModel):
     max_budget: float
     ride_type: str = "car"
     notes: str = ""
+    pool_ok: bool = False
+    scheduled_for: datetime | None = None
 
 
 class BidOut(BaseModel):
@@ -124,12 +130,14 @@ class BidOut(BaseModel):
     driver_vehicle_plate: str | None = None
     driver_rating: float | None = None
     driver_trip_count: int = 0
+    driver_trust_score: float | None = None
     driver_lat: float | None = None
     driver_lng: float | None = None
     amount: float
     eta_minutes: int
     message: str
     status: BidStatus
+    pool_key: str | None = None
     created_at: datetime
 
 
@@ -156,6 +164,9 @@ class RideOut(BaseModel):
     completed_at: datetime | None = None
     cancelled_at: datetime | None = None
     cancelled_by: str | None = None
+    auction_ends_at: datetime | None = None
+    scheduled_for: datetime | None = None
+    pool_ok: bool = False
     rider_to_driver_stars: int | None = None
     rider_to_driver_comment: str | None = None
     driver_to_rider_stars: int | None = None

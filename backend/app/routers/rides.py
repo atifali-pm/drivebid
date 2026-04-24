@@ -1,7 +1,11 @@
-from datetime import datetime
+from datetime import datetime, timedelta
+from uuid import uuid4
+
+AUCTION_WINDOW_SECONDS = 60
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
+from sqlalchemy import Integer
 from sqlalchemy.orm import Session, joinedload
 
 from ..auth import get_current_user, require_role
@@ -42,6 +46,68 @@ def _driver_stats(driver_id: int, db) -> tuple[float | None, int]:
     return avg_rating, trip_count
 
 
+def _driver_trust_score(driver_id: int, db) -> float | None:
+    """Composite reputation in the 0..100 range.
+
+    - 50 pts from star rating (5 stars == full 50)
+    - 20 pts from trip volume (100 accepted trips == full 20, linear)
+    - up to -20 penalty for cancellation rate on accepted rides
+    - up to -20 penalty for open dispute rate
+    - up to +10 reward for completion rate (completed / accepted)
+
+    Returns None when there's no accepted ride yet (not enough signal).
+    """
+    from sqlalchemy import func
+    from ..models import Dispute
+
+    accepted_count, completed_count, cancelled_count = db.query(
+        func.count(Ride.id),
+        func.sum(
+            func.coalesce(
+                (Ride.status == RideStatus.completed).cast(Integer), 0
+            )
+        ),
+        func.sum(
+            func.coalesce(
+                (Ride.status == RideStatus.cancelled).cast(Integer), 0
+            )
+        ),
+    ).join(Bid, Bid.ride_id == Ride.id).filter(
+        Bid.driver_id == driver_id,
+        Ride.accepted_bid_id == Bid.id,
+    ).first() or (0, 0, 0)
+
+    accepted = accepted_count or 0
+    if accepted == 0:
+        return None
+    completed = completed_count or 0
+    cancelled = cancelled_count or 0
+
+    avg_rating, _ = _driver_stats(driver_id, db)
+    rating_pts = 50 * (avg_rating / 5.0) if avg_rating is not None else 25
+
+    volume_pts = min(20.0, completed / 5.0)
+
+    cancellation_rate = cancelled / accepted if accepted else 0
+    completion_rate = completed / accepted if accepted else 0
+
+    dispute_count = (
+        db.query(func.count(Dispute.id))
+        .filter(Dispute.user_id == driver_id, Dispute.status == "open")
+        .scalar() or 0
+    )
+    dispute_rate = min(1.0, dispute_count / max(1, accepted))
+
+    score = (
+        rating_pts
+        + volume_pts
+        - 20 * cancellation_rate
+        - 20 * dispute_rate
+        + 10 * completion_rate
+    )
+    return round(max(0.0, min(100.0, score)), 1)
+
+
 def _ride_to_out(ride: Ride, db=None) -> RideOut:
     data = RideOut.model_validate(ride)
     data.rider_name = ride.rider.full_name if ride.rider else None
@@ -50,8 +116,10 @@ def _ride_to_out(ride: Ride, db=None) -> RideOut:
         rating, trips = (None, 0)
         driver_lat: float | None = None
         driver_lng: float | None = None
+        trust: float | None = None
         if db and b.driver:
             rating, trips = _driver_stats(b.driver_id, db)
+            trust = _driver_trust_score(b.driver_id, db)
             loc = db.get(DriverLocation, b.driver_id)
             if loc is not None:
                 driver_lat = loc.lat
@@ -67,12 +135,14 @@ def _ride_to_out(ride: Ride, db=None) -> RideOut:
             driver_vehicle_plate=b.driver.vehicle_plate if b.driver else None,
             driver_rating=rating,
             driver_trip_count=trips,
+            driver_trust_score=trust,
             driver_lat=driver_lat,
             driver_lng=driver_lng,
             amount=b.amount,
             eta_minutes=b.eta_minutes,
             message=b.message,
             status=b.status,
+            pool_key=b.pool_key,
             created_at=b.created_at,
         ))
     return data
@@ -85,6 +155,16 @@ def create_ride(
     db: Session = Depends(get_db),
     user: User = Depends(require_role(UserRole.rider)),
 ):
+    # Auction window: for same-now rides it's 60s after posting. For
+    # scheduled rides (pre-bid the night before etc.) the window stays
+    # open until ~5 minutes before departure, giving drivers a much
+    # longer bidding runway.
+    now = datetime.utcnow()
+    if payload.scheduled_for is not None and payload.scheduled_for > now + timedelta(minutes=10):
+        auction_end = payload.scheduled_for - timedelta(minutes=5)
+    else:
+        auction_end = now + timedelta(seconds=AUCTION_WINDOW_SECONDS)
+
     ride = Ride(
         rider_id=user.id,
         pickup=payload.pickup,
@@ -99,6 +179,9 @@ def create_ride(
         max_budget=payload.max_budget,
         ride_type=payload.ride_type,
         notes=payload.notes,
+        pool_ok=payload.pool_ok,
+        scheduled_for=payload.scheduled_for,
+        auction_ends_at=auction_end,
     )
     db.add(ride)
     db.commit()
@@ -239,6 +322,25 @@ def place_bid(
             status_code=400,
             detail=f"Bid exceeds rider's max budget of {ride.max_budget}",
         )
+    now = datetime.utcnow()
+    if ride.auction_ends_at is not None and now > ride.auction_ends_at:
+        raise HTTPException(status_code=400, detail="Auction window has closed")
+
+    # Undercut rule: a driver's subsequent bid must be strictly lower than
+    # their previous one. Drops the amount over time, creating the pressure
+    # that defines a time-decay reverse auction.
+    prev = (
+        db.query(Bid)
+        .filter(Bid.ride_id == ride_id, Bid.driver_id == user.id)
+        .order_by(Bid.created_at.desc())
+        .first()
+    )
+    if prev is not None and payload.amount >= prev.amount:
+        raise HTTPException(
+            status_code=400,
+            detail=f"New bid must be below your previous Rs {int(prev.amount)}",
+        )
+
     bid = Bid(
         ride_id=ride_id,
         driver_id=user.id,
@@ -268,8 +370,109 @@ def place_bid(
         eta_minutes=bid.eta_minutes,
         message=bid.message,
         status=bid.status,
+        pool_key=bid.pool_key,
         created_at=bid.created_at,
     )
+
+
+class PoolBidCreate(BaseModel):
+    ride_ids: list[int]
+    amount_per_seat: float
+    eta_minutes: int
+    message: str = ""
+
+
+@router.post("/bids/pool", response_model=list[BidOut], status_code=201)
+def place_pool_bid(
+    payload: PoolBidCreate,
+    bg: BackgroundTasks,
+    db: Session = Depends(get_db),
+    user: User = Depends(require_role(UserRole.driver)),
+):
+    """Place the same per-seat bid on a bundle of pool-OK open rides.
+
+    All rides must be pool_ok, open, and inside their auction window. Each
+    bid on a ride from the same driver must undercut the driver's previous
+    bid on that ride (if any). Bids share a pool_key so the frontend can
+    show them as a pooled offer.
+    """
+    if len(payload.ride_ids) < 2:
+        raise HTTPException(status_code=400, detail="Pool bid needs at least 2 rides")
+    if payload.amount_per_seat <= 0 or payload.eta_minutes <= 0:
+        raise HTTPException(status_code=400, detail="Invalid bid values")
+
+    now = datetime.utcnow()
+    rides = db.query(Ride).filter(Ride.id.in_(payload.ride_ids)).all()
+    if len(rides) != len(set(payload.ride_ids)):
+        raise HTTPException(status_code=404, detail="One or more rides not found")
+
+    for r in rides:
+        if r.status != RideStatus.open:
+            raise HTTPException(status_code=400, detail=f"Ride {r.id} is no longer open")
+        if not r.pool_ok:
+            raise HTTPException(status_code=400, detail=f"Ride {r.id} is not pool-eligible")
+        if r.auction_ends_at is not None and now > r.auction_ends_at:
+            raise HTTPException(status_code=400, detail=f"Ride {r.id} auction has closed")
+        if payload.amount_per_seat > r.max_budget:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Bid Rs {int(payload.amount_per_seat)} exceeds Rs {int(r.max_budget)} max on ride {r.id}",
+            )
+        prev = (
+            db.query(Bid)
+            .filter(Bid.ride_id == r.id, Bid.driver_id == user.id)
+            .order_by(Bid.created_at.desc())
+            .first()
+        )
+        if prev is not None and payload.amount_per_seat >= prev.amount:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Ride {r.id}: new bid must be below your previous Rs {int(prev.amount)}",
+            )
+
+    pool_key = uuid4().hex
+    created: list[Bid] = []
+    for r in rides:
+        b = Bid(
+            ride_id=r.id,
+            driver_id=user.id,
+            amount=payload.amount_per_seat,
+            eta_minutes=payload.eta_minutes,
+            message=payload.message,
+            pool_key=pool_key,
+        )
+        db.add(b)
+        created.append(b)
+    db.commit()
+    for b in created:
+        db.refresh(b)
+
+    for r in rides:
+        bg.add_task(manager.send_to_user, r.rider_id, REFRESH)
+        bg.add_task(
+            send_push, db, r.rider_id,
+            "Pool bid offered",
+            f"{user.full_name} offered Rs {int(payload.amount_per_seat)}/seat in a shared ride",
+            {"type": "pool_bid", "ride_id": r.id, "pool_key": pool_key},
+        )
+    return [
+        BidOut(
+            id=b.id,
+            ride_id=b.ride_id,
+            driver_id=b.driver_id,
+            driver_name=user.full_name,
+            driver_vehicle_type=user.vehicle_type,
+            driver_vehicle_model=user.vehicle_model,
+            driver_vehicle_plate=user.vehicle_plate,
+            amount=b.amount,
+            eta_minutes=b.eta_minutes,
+            message=b.message,
+            status=b.status,
+            pool_key=b.pool_key,
+            created_at=b.created_at,
+        )
+        for b in created
+    ]
 
 
 @router.post("/{ride_id}/accept/{bid_id}", response_model=RideOut)

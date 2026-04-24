@@ -49,12 +49,14 @@ export interface Bid {
   driver_vehicle_plate: string | null;
   driver_rating: number | null;
   driver_trip_count: number;
+  driver_trust_score: number | null;
   driver_lat: number | null;
   driver_lng: number | null;
   amount: number;
   eta_minutes: number;
   message: string;
   status: "pending" | "accepted" | "rejected";
+  pool_key: string | null;
   created_at: string;
 }
 
@@ -74,12 +76,15 @@ export interface Ride {
   max_budget: number;
   ride_type: string;
   notes: string;
+  pool_ok: boolean;
+  scheduled_for: string | null;
   status: RideStatus;
   accepted_bid_id: number | null;
   started_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
+  auction_ends_at: string | null;
   rider_to_driver_stars: number | null;
   rider_to_driver_comment: string | null;
   driver_to_rider_stars: number | null;
@@ -196,6 +201,8 @@ export const api = {
     max_budget: number;
     ride_type?: string;
     notes?: string;
+    pool_ok?: boolean;
+    scheduled_for?: string | null;
   }) =>
     request<Ride>("/rides", { method: "POST", body: JSON.stringify(data) }),
 

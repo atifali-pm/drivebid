@@ -16,6 +16,8 @@ import { useAuth } from "../src/useAuth";
 import { formatDistance, formatDuration, formatMoney } from "../src/pricing";
 import { DisputeModal } from "../src/DisputeModal";
 import { LeafletMap } from "../src/LeafletMap";
+import { AuctionTimer } from "../src/AuctionTimer";
+import { formatScheduledFor, isScheduled } from "../src/scheduling";
 
 function vehicleEmoji(t: string | null | undefined): string {
   return t === "motorcycle" ? "🏍️" : t === "rickshaw" ? "🛺" : t === "van" ? "🚐" : "🚗";
@@ -312,6 +314,11 @@ function RideCard({
           <Text style={styles.cardRoute}>
             {ride.pickup} → {ride.dropoff}
           </Text>
+          {isScheduled(ride.scheduled_for) && (
+            <Text style={styles.schedulePill}>
+              🕒 Scheduled {formatScheduledFor(ride.scheduled_for)}
+            </Text>
+          )}
           <Text style={styles.cardMeta}>
             Budget: {formatMoney(ride.max_budget)}
             {ride.distance_km != null && ` · ${formatDistance(ride.distance_km)}`}
@@ -365,6 +372,18 @@ function RideCard({
         </>
       )}
 
+      {ride.status === "open" && (
+        <AuctionTimer
+          auctionEndsAt={ride.auction_ends_at}
+          bidCount={ride.bids.length}
+          lowestBid={
+            ride.bids.length > 0
+              ? Math.min(...ride.bids.map((b) => b.amount))
+              : null
+          }
+        />
+      )}
+
       {ride.status === "open" && ride.bids.length > 0 && (
         <View style={styles.bids}>
           <Text style={styles.bidsLabel}>
@@ -414,10 +433,18 @@ function RideCard({
                 <View style={{ flex: 1 }}>
                   <Text style={styles.bidDriver}>
                     {bid.driver_vehicle_type === "motorcycle" ? "🏍️" : bid.driver_vehicle_type === "rickshaw" ? "🛺" : bid.driver_vehicle_type === "van" ? "🚐" : "🚗"}{" "}
-                    {bid.driver_name ?? "Driver"} — {formatMoney(bid.amount)}
+                    {bid.driver_name ?? "Driver"} , {formatMoney(bid.amount)}
+                    {bid.pool_key && (
+                      <Text style={styles.poolTag}>  POOL</Text>
+                    )}
                   </Text>
                   <Text style={styles.bidMeta}>
-                    ETA {bid.eta_minutes}m{bid.message ? ` · ${bid.message}` : ""}
+                    ETA {bid.eta_minutes}m
+                    {bid.driver_rating != null && ` · ★ ${bid.driver_rating}`}
+                    {bid.driver_trust_score != null &&
+                      ` · Trust ${Math.round(bid.driver_trust_score)}`}
+                    {bid.pool_key ? " · shared" : ""}
+                    {bid.message ? ` · ${bid.message}` : ""}
                   </Text>
                 </View>
                 <Pressable
@@ -555,6 +582,18 @@ const styles = StyleSheet.create({
   cardHeader: { flexDirection: "row", alignItems: "flex-start" },
   cardRoute: { fontSize: 15, fontWeight: "600", color: "#1e293b", marginBottom: 2 },
   cardMeta: { fontSize: 12, color: "#64748b" },
+  schedulePill: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#0891b2",
+    backgroundColor: "#cffafe",
+    alignSelf: "flex-start",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    marginBottom: 4,
+    overflow: "hidden",
+  },
   badge: { borderRadius: 10, paddingHorizontal: 8, paddingVertical: 3 },
   badgeText: { color: "#fff", fontSize: 10, fontWeight: "700", textTransform: "uppercase" },
   acceptedBar: {
@@ -593,6 +632,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   bidDriver: { fontSize: 14, fontWeight: "500", color: "#1e293b" },
+  poolTag: { fontSize: 10, fontWeight: "800", color: "#0891b2" },
   bidMeta: { fontSize: 11, color: "#94a3b8" },
   acceptBtn: {
     backgroundColor: "#0ea5e9",

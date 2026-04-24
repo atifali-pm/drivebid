@@ -17,6 +17,9 @@ import { useAuth } from "../src/useAuth";
 import { formatDistance, formatDuration, formatMoney } from "../src/pricing";
 import { WheelPicker } from "../src/WheelPicker";
 import { DisputeModal } from "../src/DisputeModal";
+import { AuctionTimer } from "../src/AuctionTimer";
+import { formatScheduledFor, isScheduled } from "../src/scheduling";
+import { rideTypeIcon, rideTypeLabel, isCompositeService } from "../src/rideTypes";
 
 const SCREENSHOT_MODE = false;
 const MOCK_DRIVER_NAME = "Bilal Hussain";
@@ -232,25 +235,45 @@ export default function Dashboard() {
         contentContainerStyle={{ paddingBottom: 20 }}
         stickySectionHeadersEnabled={false}
         ListHeaderComponent={
-          archivedRides.length > 0 ? (
-            <Pressable
-              style={styles.archiveRow}
-              android_ripple={{ color: "rgba(148,163,184,0.2)" }}
-              onPress={() => router.push("/archived")}
-            >
-              <View style={styles.archiveIconWrap}>
-                <Text style={styles.archiveIcon}>📦</Text>
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.archiveRowTitle}>Archived</Text>
-                <Text style={styles.archiveRowSub}>
-                  {archivedRides.length} ride
-                  {archivedRides.length === 1 ? "" : "s"}
-                </Text>
-              </View>
-              <Text style={styles.archiveChevron}>›</Text>
-            </Pressable>
-          ) : null
+          <View>
+            {openRides.filter((r) => r.pool_ok).length >= 2 && (
+              <Pressable
+                style={styles.poolRow}
+                android_ripple={{ color: "rgba(6,182,212,0.2)" }}
+                onPress={() => router.push("/pool-bid")}
+              >
+                <View style={styles.poolIconWrap}>
+                  <Text style={styles.poolIcon}>🪑</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.poolRowTitle}>Pool bid</Text>
+                  <Text style={styles.poolRowSub}>
+                    {openRides.filter((r) => r.pool_ok).length} rides open to sharing
+                  </Text>
+                </View>
+                <Text style={styles.archiveChevron}>›</Text>
+              </Pressable>
+            )}
+            {archivedRides.length > 0 && (
+              <Pressable
+                style={styles.archiveRow}
+                android_ripple={{ color: "rgba(148,163,184,0.2)" }}
+                onPress={() => router.push("/archived")}
+              >
+                <View style={styles.archiveIconWrap}>
+                  <Text style={styles.archiveIcon}>📦</Text>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.archiveRowTitle}>Archived</Text>
+                  <Text style={styles.archiveRowSub}>
+                    {archivedRides.length} ride
+                    {archivedRides.length === 1 ? "" : "s"}
+                  </Text>
+                </View>
+                <Text style={styles.archiveChevron}>›</Text>
+              </Pressable>
+            )}
+          </View>
         }
       />
       {toast && (
@@ -295,6 +318,24 @@ function OpenRideCard({
   const [message, setMessage] = useState("");
   const [loading, setLoading] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [auctionTick, setAuctionTick] = useState(() => Date.now());
+
+  const auctionClosed =
+    ride.auction_ends_at != null &&
+    auctionTick > new Date(ride.auction_ends_at).getTime();
+
+  // Re-render this card every second while the auction is open, so the
+  // closed/bid-form state flips the instant the window elapses.
+  useEffect(() => {
+    if (!ride.auction_ends_at || auctionClosed) return;
+    const t = setInterval(() => setAuctionTick(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [ride.auction_ends_at, auctionClosed]);
+
+  // Only expose bid amounts below the driver's previous bid (undercut rule)
+  const allowedBidValues = myBid
+    ? BID_AMOUNT_VALUES.filter((v) => v < myBid.amount)
+    : BID_AMOUNT_VALUES;
 
   async function handleBid() {
     setLoading(true);
@@ -321,11 +362,14 @@ function OpenRideCard({
     <View style={styles.card}>
       <Pressable onPress={() => setExpanded((e) => !e)}>
         <View style={styles.cardHeaderRow}>
-          <Text style={styles.rideTypeIcon}>
-            {ride.ride_type === "motorcycle" ? "🏍️" : ride.ride_type === "rickshaw" ? "🛺" : ride.ride_type === "van" ? "🚐" : "🚗"}
-          </Text>
+          <Text style={styles.rideTypeIcon}>{rideTypeIcon(ride.ride_type)}</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.cardRoute}>{ride.pickup} → {ride.dropoff}</Text>
+            {isScheduled(ride.scheduled_for) && (
+              <Text style={styles.schedulePill}>
+                🕒 {formatScheduledFor(ride.scheduled_for)}
+              </Text>
+            )}
           </View>
           <Text style={styles.expandChevron}>{expanded ? "▲" : "▼"}</Text>
           <Pressable
@@ -341,7 +385,12 @@ function OpenRideCard({
         </View>
         <View style={styles.budgetBanner}>
           <Text style={styles.budgetBannerLabel}>MAX BUDGET</Text>
-          <Text style={styles.budgetBannerAmount}>{formatMoney(ride.max_budget)}</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            {ride.pool_ok && (
+              <Text style={styles.poolBadge}>POOL OK</Text>
+            )}
+            <Text style={styles.budgetBannerAmount}>{formatMoney(ride.max_budget)}</Text>
+          </View>
         </View>
         <Text style={styles.cardMeta}>
           {ride.rider_name}
@@ -354,23 +403,39 @@ function OpenRideCard({
         </Text>
       </Pressable>
 
-      {myBid ? (
-        <View style={styles.myBidBox}>
-          <Text style={styles.myBidText}>
-            You bid {formatMoney(myBid.amount)}
-          </Text>
-        </View>
+      <AuctionTimer
+        auctionEndsAt={ride.auction_ends_at}
+        bidCount={ride.bids.length}
+        lowestBid={
+          ride.bids.length > 0
+            ? Math.min(...ride.bids.map((b) => b.amount))
+            : null
+        }
+      />
+
+      {auctionClosed ? (
+        myBid ? (
+          <View style={styles.myBidBox}>
+            <Text style={styles.myBidText}>
+              Your final bid: {formatMoney(myBid.amount)}
+            </Text>
+          </View>
+        ) : null
       ) : expanded ? (
         <View style={styles.bidForm}>
-          {ride.estimated_fare != null && (
+          {myBid ? (
+            <Text style={[styles.suggest, { color: "#c2410c" }]}>
+              Your last bid: Rs {myBid.amount}. New bid must be lower.
+            </Text>
+          ) : ride.estimated_fare != null ? (
             <Text style={styles.suggest}>
               Suggested: {formatMoney(ride.estimated_fare)}
             </Text>
-          )}
+          ) : null}
           <View style={styles.wheelRow}>
             <Text style={styles.wheelLabel}>YOUR BID</Text>
             <WheelPicker
-              values={BID_AMOUNT_VALUES}
+              values={allowedBidValues}
               value={amount}
               onChange={setAmount}
               formatLabel={(n) => `Rs ${n}`}
@@ -568,6 +633,19 @@ const styles = StyleSheet.create({
   rideTypeIcon: { fontSize: 24, marginRight: 4 },
   cardHeaderRow: { flexDirection: "row", alignItems: "flex-start", gap: 8 },
   cardRoute: { fontSize: 14, fontWeight: "600", color: "#1e293b", marginBottom: 2 },
+  schedulePill: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#0891b2",
+    backgroundColor: "#cffafe",
+    alignSelf: "flex-start",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 5,
+    marginTop: 2,
+    marginBottom: 2,
+    overflow: "hidden",
+  },
   archiveBtn: {
     paddingHorizontal: 10,
     paddingVertical: 6,
@@ -686,6 +764,42 @@ const styles = StyleSheet.create({
   },
   paidText: { color: "#047857", fontSize: 12, fontWeight: "700" },
   reportLink: { color: "#dc2626", fontSize: 11, fontWeight: "600" },
+  poolRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ecfeff",
+    marginHorizontal: 16,
+    marginTop: 8,
+    marginBottom: 4,
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#06b6d4",
+  },
+  poolIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#cffafe",
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  poolIcon: { fontSize: 18 },
+  poolRowTitle: { fontSize: 15, fontWeight: "700", color: "#0f172a" },
+  poolRowSub: { fontSize: 12, color: "#0891b2", marginTop: 2 },
+  poolBadge: {
+    fontSize: 9,
+    fontWeight: "800",
+    color: "#0891b2",
+    backgroundColor: "#cffafe",
+    borderRadius: 4,
+    paddingHorizontal: 6,
+    paddingVertical: 3,
+    letterSpacing: 0.5,
+    overflow: "hidden",
+  },
   archiveRow: {
     flexDirection: "row",
     alignItems: "center",

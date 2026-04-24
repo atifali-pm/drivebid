@@ -29,8 +29,19 @@ export type RideStatus =
 export interface User {
   id: number;
   email: string;
+  phone?: string | null;
   full_name: string;
   role: UserRole;
+  vehicle_type?: string | null;
+  vehicle_model?: string | null;
+  vehicle_color?: string | null;
+  vehicle_plate?: string | null;
+  min_fare?: number | null;
+  rate_per_km?: number | null;
+  rate_per_min?: number | null;
+  is_online?: boolean;
+  sms_fallback_enabled?: boolean;
+  sms_phone?: string | null;
   created_at: string;
 }
 
@@ -45,12 +56,14 @@ export interface Bid {
   driver_vehicle_plate: string | null;
   driver_rating: number | null;
   driver_trip_count: number;
+  driver_trust_score: number | null;
   driver_lat: number | null;
   driver_lng: number | null;
   amount: number;
   eta_minutes: number;
   message: string;
   status: "pending" | "accepted" | "rejected";
+  pool_key: string | null;
   created_at: string;
 }
 
@@ -70,12 +83,15 @@ export interface Ride {
   max_budget: number;
   ride_type: string;
   notes: string;
+  pool_ok: boolean;
+  scheduled_for: string | null;
   status: RideStatus;
   accepted_bid_id: number | null;
   started_at: string | null;
   completed_at: string | null;
   cancelled_at: string | null;
   cancelled_by: string | null;
+  auction_ends_at: string | null;
   rider_to_driver_stars: number | null;
   rider_to_driver_comment: string | null;
   driver_to_rider_stars: number | null;
@@ -204,6 +220,17 @@ export const api = {
     data: { amount: number; eta_minutes: number; message?: string }
   ) =>
     request<Bid>(`/rides/${rideId}/bids`, {
+      method: "POST",
+      body: JSON.stringify(data),
+    }),
+
+  placePoolBid: (data: {
+    ride_ids: number[];
+    amount_per_seat: number;
+    eta_minutes: number;
+    message?: string;
+  }) =>
+    request<Bid[]>(`/rides/bids/pool`, {
       method: "POST",
       body: JSON.stringify(data),
     }),

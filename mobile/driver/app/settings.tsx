@@ -37,6 +37,8 @@ export default function DriverSettings() {
   const [ratePerKm, setRatePerKm] = useState("");
   const [ratePerMin, setRatePerMin] = useState("");
   const [isOnline, setIsOnline] = useState(false);
+  const [smsFallbackEnabled, setSmsFallbackEnabled] = useState(false);
+  const [smsPhone, setSmsPhone] = useState("");
 
   useEffect(() => {
     (async () => {
@@ -58,6 +60,8 @@ export default function DriverSettings() {
         setRatePerKm(u.rate_per_km ? String(u.rate_per_km) : "");
         setRatePerMin(u.rate_per_min ? String(u.rate_per_min) : "");
         setIsOnline(u.is_online ?? false);
+        setSmsFallbackEnabled(u.sms_fallback_enabled ?? false);
+        setSmsPhone(u.sms_phone ?? u.phone ?? "");
       } catch {
         /* ignore */
       } finally {
@@ -80,6 +84,8 @@ export default function DriverSettings() {
         min_fare: minFare ? Number(minFare) : undefined,
         rate_per_km: ratePerKm ? Number(ratePerKm) : undefined,
         rate_per_min: ratePerMin ? Number(ratePerMin) : undefined,
+        sms_fallback_enabled: smsFallbackEnabled,
+        sms_phone: smsPhone || undefined,
       };
       const res = await fetch(`${API_BASE}/auth/profile`, {
         method: "PATCH",
@@ -262,6 +268,41 @@ export default function DriverSettings() {
         />
       </View>
 
+      <Text style={styles.sectionTitle}>When you go offline</Text>
+      <Text style={styles.sectionSub}>
+        DriveBid can text you open rides and accept bids via SMS when your
+        data connection drops. Useful on long trips through weak-signal areas.
+      </Text>
+      <View style={styles.card}>
+        <Pressable
+          style={[styles.smsRow, smsFallbackEnabled && styles.smsRowOn]}
+          onPress={() => setSmsFallbackEnabled((v) => !v)}
+        >
+          <View style={[styles.smsBox, smsFallbackEnabled && styles.smsBoxOn]}>
+            {smsFallbackEnabled && <Text style={styles.smsTick}>✓</Text>}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.smsTitle}>Get ride alerts by SMS when offline</Text>
+            <Text style={styles.smsSub}>
+              Currently a preview: your preference is saved, and SMS delivery
+              ships as soon as the provider is wired up.
+            </Text>
+          </View>
+        </Pressable>
+        {smsFallbackEnabled && (
+          <>
+            <Text style={[styles.fieldLabel, { marginTop: 14 }]}>SMS phone</Text>
+            <TextInput
+              style={styles.input}
+              value={smsPhone}
+              onChangeText={setSmsPhone}
+              placeholder="+92..."
+              keyboardType="phone-pad"
+            />
+          </>
+        )}
+      </View>
+
       {/* Save button */}
       <Pressable
         style={[styles.saveBtn, saving && { opacity: 0.6 }]}
@@ -385,6 +426,34 @@ const styles = StyleSheet.create({
   },
   rateRow: { flexDirection: "row", gap: 10 },
   rateCol: { flex: 1 },
+  smsRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 12,
+    padding: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
+  },
+  smsRowOn: {
+    borderColor: "#06b6d4",
+    backgroundColor: "#ecfeff",
+  },
+  smsBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: "#cbd5e1",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 2,
+  },
+  smsBoxOn: { borderColor: "#06b6d4", backgroundColor: "#06b6d4" },
+  smsTick: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  smsTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  smsSub: { fontSize: 11, color: "#64748b", marginTop: 2, lineHeight: 16 },
   saveBtn: {
     marginHorizontal: 16,
     marginTop: 24,

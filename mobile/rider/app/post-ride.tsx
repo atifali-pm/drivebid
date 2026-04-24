@@ -21,10 +21,23 @@ const RIDE_TYPES = [
   { key: "motorcycle", label: "Bike", icon: "🏍️" },
   { key: "rickshaw", label: "Rickshaw", icon: "🛺" },
   { key: "van", label: "Van", icon: "🚐" },
+  { key: "parcel", label: "Parcel", icon: "📦" },
+  { key: "freight", label: "Freight", icon: "🚛" },
+  { key: "task", label: "Task", icon: "🧰" },
 ];
 
 // Build a list of budget values from Rs 200 to Rs 5000 in Rs 10 steps
 const BUDGET_VALUES = Array.from({ length: 481 }, (_, i) => 200 + i * 10);
+
+const SCHEDULE_OFFSETS: { label: string; min: number | null }[] = [
+  { label: "Now", min: null },
+  { label: "In 30 min", min: 30 },
+  { label: "In 1 hour", min: 60 },
+  { label: "In 2 hours", min: 120 },
+  { label: "In 4 hours", min: 240 },
+  { label: "In 12 hours", min: 720 },
+  { label: "Tomorrow", min: 1440 },
+];
 
 export default function PostRide() {
   const router = useRouter();
@@ -38,6 +51,9 @@ export default function PostRide() {
   const [budget, setBudget] = useState<number>(1500);
   const [rideType, setRideType] = useState("car");
   const [notes, setNotes] = useState("");
+  const [poolOk, setPoolOk] = useState(false);
+  // "now" plus one of the preset offsets; null means go immediately.
+  const [scheduleOffsetMin, setScheduleOffsetMin] = useState<number | null>(null);
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
@@ -112,6 +128,9 @@ export default function PostRide() {
     motorcycle:  { base: 80,  perKm: 50,  speed: 30 },
     rickshaw:   { base: 100, perKm: 60,  speed: 20 },
     van:        { base: 250, perKm: 120, speed: 22 },
+    parcel:     { base: 120, perKm: 60,  speed: 25 },
+    freight:    { base: 500, perKm: 180, speed: 20 },
+    task:       { base: 300, perKm: 40,  speed: 25 },
   };
 
   const pricing = RIDE_PRICING[rideType] ?? RIDE_PRICING.car;
@@ -162,6 +181,11 @@ export default function PostRide() {
         max_budget: budget,
         ride_type: rideType,
         notes,
+        pool_ok: poolOk,
+        scheduled_for:
+          scheduleOffsetMin != null
+            ? new Date(Date.now() + scheduleOffsetMin * 60_000).toISOString()
+            : null,
       });
       router.back();
     } catch (err) {
@@ -330,6 +354,45 @@ export default function PostRide() {
           />
         </View>
 
+        <Text style={styles.label}>When do you want to go?</Text>
+        <View style={styles.scheduleRow}>
+          {SCHEDULE_OFFSETS.map((opt) => {
+            const on = scheduleOffsetMin === opt.min;
+            return (
+              <Pressable
+                key={opt.label}
+                onPress={() => setScheduleOffsetMin(opt.min)}
+                style={[styles.scheduleChip, on && styles.scheduleChipOn]}
+              >
+                <Text style={[styles.scheduleChipText, on && styles.scheduleChipTextOn]}>
+                  {opt.label}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+        {scheduleOffsetMin != null && scheduleOffsetMin > 0 && (
+          <Text style={styles.scheduleHint}>
+            Drivers can bid until about 5 min before departure.
+          </Text>
+        )}
+
+        <Pressable
+          style={[styles.poolRow, poolOk && styles.poolRowOn]}
+          onPress={() => setPoolOk((v) => !v)}
+        >
+          <View style={[styles.poolBox, poolOk && styles.poolBoxOn]}>
+            {poolOk && <Text style={styles.poolTick}>✓</Text>}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.poolTitle}>Happy to share the ride (pool)</Text>
+            <Text style={styles.poolSub}>
+              Drivers can offer a shared bid with another rider going your way.
+              Cheaper if matched, normal bids still come in either way.
+            </Text>
+          </View>
+        </Pressable>
+
         <Text style={styles.label}>Notes for driver</Text>
         <TextInput
           style={styles.notes}
@@ -486,6 +549,63 @@ const styles = StyleSheet.create({
     paddingHorizontal: 4,
     marginBottom: 14,
   },
+  scheduleRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+    marginBottom: 4,
+  },
+  scheduleChip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#fff",
+  },
+  scheduleChipOn: {
+    borderColor: "#06b6d4",
+    backgroundColor: "#ecfeff",
+  },
+  scheduleChipText: { fontSize: 12, color: "#64748b", fontWeight: "600" },
+  scheduleChipTextOn: { color: "#0891b2", fontWeight: "800" },
+  scheduleHint: {
+    fontSize: 11,
+    color: "#64748b",
+    marginTop: 4,
+    marginBottom: 10,
+    fontStyle: "italic",
+  },
+  poolRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: "#e2e8f0",
+    backgroundColor: "#f8fafc",
+    marginBottom: 14,
+    marginTop: 6,
+  },
+  poolRowOn: {
+    borderColor: "#06b6d4",
+    backgroundColor: "#ecfeff",
+  },
+  poolBox: {
+    width: 22,
+    height: 22,
+    borderRadius: 5,
+    borderWidth: 2,
+    borderColor: "#cbd5e1",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  poolBoxOn: { borderColor: "#06b6d4", backgroundColor: "#06b6d4" },
+  poolTick: { color: "#fff", fontSize: 14, fontWeight: "800" },
+  poolTitle: { fontSize: 14, fontWeight: "700", color: "#0f172a" },
+  poolSub: { fontSize: 11, color: "#64748b", marginTop: 2 },
   notes: {
     borderWidth: 1,
     borderColor: "#e2e8f0",

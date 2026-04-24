@@ -24,3 +24,5 @@ build/
 
 # SQLite prototype DB
 *.db
+# Claude Code local state
+.claude/

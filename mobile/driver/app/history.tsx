@@ -11,6 +11,7 @@ import {
 import { useRouter } from "expo-router";
 import { api, Ride } from "../src/api";
 import { formatDistance, formatDuration, formatMoney } from "../src/pricing";
+import { rideTypeIcon } from "../src/rideTypes";
 
 const STATUS_COLORS: Record<string, string> = {
   completed: "#10b981",
@@ -95,9 +96,7 @@ export default function History() {
         contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
         renderItem={({ item }) => {
           const bid = item.bids.find((b) => b.id === item.accepted_bid_id);
-          const icon = item.ride_type === "motorcycle" ? "🏍️"
-            : item.ride_type === "rickshaw" ? "🛺"
-            : item.ride_type === "van" ? "🚐" : "🚗";
+          const icon = rideTypeIcon(item.ride_type);
           return (
             <View style={styles.rideCard}>
               <View style={styles.rideHeader}>
